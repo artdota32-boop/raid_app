@@ -26,8 +26,10 @@ jobs:
       - name: Create Android project with minSdk 26
         run: |
           flutter create --org com.raidapp --project-name raid_app --platforms=android .
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 26/g' android/app/build.gradle.kts
           sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 26/g' android/app/build.gradle.kts
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 26/g' android/app/build.gradle
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 26/g' android/app/build.gradle.kts
+          grep minSdk android/app/build.gradle.kts
           flutter pub get
 
       - name: Build APK
