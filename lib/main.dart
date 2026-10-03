@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:snapframes/snapframes.dart';
 import 'package:image/image.dart' as img;
+import 'package:paddle_ocr_native/paddle_ocr_native.dart';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -31,9 +32,9 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   File? _videoFile;
-  Uint8List? _frameBytes;
   Uint8List? _croppedBytes;
   String _status = 'Выбери видео';
+  String _ocrText = '';
 
   Future<void> _pickVideo() async {
     final picker = ImagePicker();
@@ -42,8 +43,8 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _videoFile = File(picked.path);
         _status = 'Видео выбрано, вырезаю кадр...';
-        _frameBytes = null;
         _croppedBytes = null;
+        _ocrText = '';
       });
       await _extractFrame();
     }
@@ -65,10 +66,10 @@ class _HomePageState extends State<HomePage> {
       }
       final cropped = _cropBottomLeft(bytes);
       setState(() {
-        _frameBytes = bytes;
         _croppedBytes = cropped;
-        _status = 'Кадр вырезан и обрезан!';
+        _status = 'Кадр обрезан! Запускаю OCR...';
       });
+      await _runOcr(cropped);
     } catch (e) {
       setState(() => _status = 'Ошибка: $e');
     }
@@ -78,7 +79,6 @@ class _HomePageState extends State<HomePage> {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
 
-    // Координаты для кадра 1600x720
     final xStart = 70;
     final yStart = 360;
     final xEnd = 460;
@@ -93,6 +93,32 @@ class _HomePageState extends State<HomePage> {
     );
 
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
+  }
+
+  Future<void> _runOcr(Uint8List? cropped) async {
+    if (cropped == null) return;
+    try {
+      final ocr = PaddleOcr();
+      await ocr.init(
+        config: const PaddleOcrConfig(),
+        engine: const EngineConfig(numThreads: 4),
+      );
+
+      // Сохраняем кроп во временный файл
+      final tempDir = Directory.systemTemp;
+      final tempFile = File('${tempDir.path}/crop_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      await tempFile.writeAsBytes(cropped);
+
+      final run = await ocr.recognize(tempFile.path);
+      final text = run.results.map((r) => r.text).join('\n');
+
+      setState(() {
+        _ocrText = text;
+        _status = 'OCR завершён!';
+      });
+    } catch (e) {
+      setState(() => _status = 'Ошибка OCR: $e');
+    }
   }
 
   @override
@@ -117,6 +143,14 @@ class _HomePageState extends State<HomePage> {
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Image.memory(_croppedBytes!, width: 300),
+                ),
+              if (_ocrText.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    _ocrText,
+                    style: const TextStyle(fontSize: 14),
+                  ),
                 ),
             ],
           ),
