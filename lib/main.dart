@@ -82,7 +82,7 @@ class _HomePageState extends State<HomePage> {
     final xStart = 70;
     final yStart = 360;
     final xEnd = 460;
-    final yEnd = 710;
+    final yEnd = 760;
 
     final cropped = img.copyCrop(
       decoded,
