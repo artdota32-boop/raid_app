@@ -79,10 +79,10 @@ class _HomePageState extends State<HomePage> {
     if (decoded == null) return null;
 
     // Координаты для кадра 1600x720
-    final xStart = 90;
-    final yStart = 380;
-    final xEnd = 490;
-    final yEnd = 700;
+    final xStart = 70;
+    final yStart = 360;
+    final xEnd = 470;
+    final yEnd = 710;
 
     final cropped = img.copyCrop(
       decoded,
