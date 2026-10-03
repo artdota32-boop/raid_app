@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:fc_native_video_thumbnail/fc_native_video_thumbnail.dart';
+import 'package:snapframes/snapframes.dart';
 import 'dart:io';
+import 'dart:typed_data';
 
 void main() {
   runApp(const MyApp());
@@ -29,7 +30,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   File? _videoFile;
-  String? _thumbnailPath;
+  Uint8List? _frameBytes;
   String _status = 'Выбери видео';
 
   Future<void> _pickVideo() async {
@@ -39,7 +40,7 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _videoFile = File(picked.path);
         _status = 'Видео выбрано, вырезаю кадр...';
-        _thumbnailPath = null;
+        _frameBytes = null;
       });
       await _extractFrame();
     }
@@ -48,22 +49,16 @@ class _HomePageState extends State<HomePage> {
   Future<void> _extractFrame() async {
     if (_videoFile == null) return;
     try {
-      final thumbnailPath = await FcNativeVideoThumbnail()
-          .getVideoThumbnail(
-            srcFile: _videoFile!.path,
-            destFile: '${_videoFile!.parent.path}/thumbnail.jpg',
-            width: 1600,
-            height: 720,
-            timeMs: 2000,
-            format: 'jpeg',
-            quality: 90,
-          );
-
+      final req = SnapRequest(
+        source: _videoFile!.path,
+        timestampMs: 2000,
+        format: SnapImageFormat.jpg,
+        quality: 90,
+      );
+      final bytes = await getFrameBytes(req);
       setState(() {
-        _thumbnailPath = thumbnailPath;
-        _status = thumbnailPath != null
-            ? 'Кадр вырезан!'
-            : 'Не удалось вырезать кадр';
+        _frameBytes = bytes;
+        _status = bytes != null ? 'Кадр вырезан!' : 'Не удалось вырезать кадр';
       });
     } catch (e) {
       setState(() {
@@ -90,13 +85,10 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 20),
               Text(_status, style: const TextStyle(fontSize: 16)),
               const SizedBox(height: 20),
-              if (_thumbnailPath != null)
+              if (_frameBytes != null)
                 Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Image.file(
-                    File(_thumbnailPath!),
-                    width: 300,
-                  ),
+                  child: Image.memory(_frameBytes!, width: 300),
                 ),
             ],
           ),
