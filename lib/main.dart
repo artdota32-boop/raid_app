@@ -35,6 +35,27 @@ class _HomePageState extends State<HomePage> {
   Uint8List? _croppedBytes;
   String _status = 'Выбери видео';
   String _ocrText = '';
+  PaddleOcr? _ocr;
+
+  @override
+  void initState() {
+    super.initState();
+    _initOcr();
+  }
+
+  Future<void> _initOcr() async {
+    try {
+      setState(() => _status = 'Инициализация OCR...');
+      _ocr = PaddleOcr();
+      await _ocr!.init(
+        config: const PaddleOcrConfig(),
+        engine: const EngineConfig(numThreads: 4),
+      );
+      setState(() => _status = 'OCR готов. Выбери видео');
+    } catch (e) {
+      setState(() => _status = 'Ошибка инициализации OCR: $e');
+    }
+  }
 
   Future<void> _pickVideo() async {
     final picker = ImagePicker();
@@ -96,20 +117,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _runOcr(Uint8List? cropped) async {
-    if (cropped == null) return;
+    if (cropped == null || _ocr == null) return;
     try {
-      final ocr = PaddleOcr();
-      await ocr.init(
-        config: const PaddleOcrConfig(),
-        engine: const EngineConfig(numThreads: 4),
-      );
-
-      // Сохраняем кроп во временный файл
       final tempDir = Directory.systemTemp;
-      final tempFile = File('${tempDir.path}/crop_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      final tempFile = File('${tempDir.path}/crop.jpg');
       await tempFile.writeAsBytes(cropped);
 
-      final run = await ocr.recognize(tempFile.path);
+      final run = await _ocr!.recognize(tempFile.path);
       final text = run.results.map((r) => r.text).join('\n');
 
       setState(() {
@@ -132,7 +146,7 @@ class _HomePageState extends State<HomePage> {
             children: [
               const SizedBox(height: 20),
               ElevatedButton.icon(
-                onPressed: _pickVideo,
+                onPressed: _status.contains('OCR готов') ? _pickVideo : null,
                 icon: const Icon(Icons.video_library),
                 label: const Text('Выбрать видео'),
               ),
