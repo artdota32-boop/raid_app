@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:snapframes/snapframes.dart';
+import 'package:image/image.dart' as img;
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -31,6 +32,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   File? _videoFile;
   Uint8List? _frameBytes;
+  Uint8List? _croppedBytes;
   String _status = 'Выбери видео';
 
   Future<void> _pickVideo() async {
@@ -41,6 +43,7 @@ class _HomePageState extends State<HomePage> {
         _videoFile = File(picked.path);
         _status = 'Видео выбрано, вырезаю кадр...';
         _frameBytes = null;
+        _croppedBytes = null;
       });
       await _extractFrame();
     }
@@ -56,15 +59,40 @@ class _HomePageState extends State<HomePage> {
         quality: 90,
       );
       final bytes = await getFrameBytes(req);
+      if (bytes == null) {
+        setState(() => _status = 'Не удалось вырезать кадр');
+        return;
+      }
+      final cropped = _cropBottomLeft(bytes);
       setState(() {
         _frameBytes = bytes;
-        _status = bytes != null ? 'Кадр вырезан!' : 'Не удалось вырезать кадр';
+        _croppedBytes = cropped;
+        _status = 'Кадр вырезан и обрезан!';
       });
     } catch (e) {
-      setState(() {
-        _status = 'Ошибка: $e';
-      });
+      setState(() => _status = 'Ошибка: $e');
     }
+  }
+
+  Uint8List? _cropBottomLeft(Uint8List bytes) {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return null;
+
+    // Координаты для кадра 1600x720
+    final xStart = 90;
+    final yStart = 380;
+    final xEnd = 490;
+    final yEnd = 700;
+
+    final cropped = img.copyCrop(
+      decoded,
+      x: xStart,
+      y: yStart,
+      width: xEnd - xStart,
+      height: yEnd - yStart,
+    );
+
+    return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
   @override
@@ -85,10 +113,10 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 20),
               Text(_status, style: const TextStyle(fontSize: 16)),
               const SizedBox(height: 20),
-              if (_frameBytes != null)
+              if (_croppedBytes != null)
                 Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Image.memory(_frameBytes!, width: 300),
+                  child: Image.memory(_croppedBytes!, width: 300),
                 ),
             ],
           ),
