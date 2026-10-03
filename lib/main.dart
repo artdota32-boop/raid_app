@@ -81,7 +81,7 @@ class _HomePageState extends State<HomePage> {
     // Координаты для кадра 1600x720
     final xStart = 70;
     final yStart = 360;
-    final xEnd = 390;
+    final xEnd = 400;
     final yEnd = 710;
 
     final cropped = img.copyCrop(
