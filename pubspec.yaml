@@ -1,0 +1,19 @@
+name: raid_app
+description: Raid artifact scanner
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  paddle_ocr_native: ^0.1.1
+  image_picker: ^1.0.4
+  path_provider: ^2.1.1
+  video_thumbnail: ^0.5.3
+  image: ^4.1.0
+
+flutter:
+  uses-material-design: true
