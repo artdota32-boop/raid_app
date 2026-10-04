@@ -17,3 +17,7 @@ dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/models/det.onnx
+    - assets/models/rec.onnx
+    - assets/models/dict.txt

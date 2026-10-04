@@ -100,9 +100,9 @@ class _HomePageState extends State<HomePage> {
     try {
       final ocr = await PaddleOcr.create(
         source: ModelSource.filePaths(
-          det: '/absolute/path/det.onnx',
-          rec: '/absolute/path/rec.onnx',
-          dict: '/absolute/path/dict.txt',
+          det: 'assets/models/det.onnx',
+          rec: 'assets/models/rec.onnx',
+          dict: 'assets/models/dict.txt',
         ),
       );
 
