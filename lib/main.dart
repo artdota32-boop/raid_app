@@ -154,14 +154,14 @@ class _HomePageState extends State<HomePage> {
         return aY.compareTo(bY);
       });
       final allResults = [...results, ...rightSorted];
-      final sorted = List<OcrResult>.from(allResults);
+      final sorted = List<OcrResult>.from(results);
       sorted.sort((a, b) {
         final aY = a.points.isEmpty ? 0.0 : a.points.first.dy;
         final bY = b.points.isEmpty ? 0.0 : b.points.first.dy;
         return aY.compareTo(bY);
       });
 
-      final text = sorted.map((r) => r.text).join('\n');
+      final text = sorted.map((r) => r.text).join("\n") + "\n" + rightSorted.map((r) => r.text).join("\n");
 
       setState(() {
         _ocrText = text;
