@@ -32,8 +32,21 @@ jobs:
           grep minSdk android/app/build.gradle.kts
           flutter pub get
 
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/raid-key.jks
+
       - name: Build APK
         run: flutter build apk --debug
+
+      - name: Sign APK
+        run: |
+          jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 \
+            -keystore android/app/raid-key.jks \
+            -storepass ${{ secrets.KEYSTORE_PASSWORD }} \
+            -keypass ${{ secrets.KEY_PASSWORD }} \
+            build/app/outputs/flutter-apk/app-debug.apk \
+            ${{ secrets.KEY_ALIAS }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
