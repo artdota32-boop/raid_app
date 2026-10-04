@@ -110,10 +110,12 @@ class _HomePageState extends State<HomePage> {
   Future<void> _runOcr(Uint8List? cropped) async {
     if (cropped == null) return;
     try {
+      print("STEP 1: copying models");
       final detPath = await _copyAssetToFile('assets/models/det.onnx', 'det.onnx');
       final recPath = await _copyAssetToFile('assets/models/rec.onnx', 'rec.onnx');
       final dictPath = await _copyAssetToFile('assets/models/dict.txt', 'dict.txt');
 
+      print("STEP 2: creating OCR");
       final ocr = await PaddleOcr.create(
         source: ModelSource.filePaths(
           det: detPath,
@@ -122,6 +124,7 @@ class _HomePageState extends State<HomePage> {
         ),
       );
 
+      print("STEP 3: recognizing");
       final results = await ocr.recognize(cropped);
       final text = results.map((r) => r.text).join("\n");
       await ocr.dispose();
