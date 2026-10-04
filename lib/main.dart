@@ -33,6 +33,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   File? _videoFile;
   Uint8List? _croppedBytes;
+  Uint8List? _processedBytes;
   String _status = 'Выбери видео';
   String _ocrText = '';
   PaddleOcr? _ocr;
@@ -65,6 +66,7 @@ class _HomePageState extends State<HomePage> {
         _videoFile = File(picked.path);
         _status = 'Видео выбрано, вырезаю кадр...';
         _croppedBytes = null;
+        _processedBytes = null;
         _ocrText = '';
       });
       await _extractFrame();
@@ -86,11 +88,13 @@ class _HomePageState extends State<HomePage> {
         return;
       }
       final cropped = _cropBottomLeft(bytes);
+      final processed = _preprocess(cropped);
       setState(() {
         _croppedBytes = cropped;
-        _status = 'Кадр обрезан! Запускаю OCR...';
+        _processedBytes = processed;
+        _status = 'Кадр обрезан и обработан! Запускаю OCR...';
       });
-      await _runOcr(cropped);
+      await _runOcr(processed);
     } catch (e) {
       setState(() => _status = 'Ошибка: $e');
     }
@@ -116,12 +120,38 @@ class _HomePageState extends State<HomePage> {
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
-  Future<void> _runOcr(Uint8List? cropped) async {
-    if (cropped == null || _ocr == null) return;
+  Uint8List? _preprocess(Uint8List? cropped) {
+    if (cropped == null) return null;
+    final decoded = img.decodeImage(cropped);
+    if (decoded == null) return null;
+
+    // 1. Увеличение в 3 раза
+    final scaled = img.copyResize(
+      decoded,
+      width: decoded.width * 3,
+      height: decoded.height * 3,
+      interpolation: img.Interpolation.cubic,
+    );
+
+    // 2. Перевод в оттенки серого
+    final grayscale = img.grayscale(scaled);
+
+    // 3. Повышение контраста
+    final contrasted = img.adjustColor(
+      grayscale,
+      contrast: 1.5,
+      brightness: 1.1,
+    );
+
+    return Uint8List.fromList(img.encodeJpg(contrasted, quality: 95));
+  }
+
+  Future<void> _runOcr(Uint8List? processed) async {
+    if (processed == null || _ocr == null) return;
     try {
       final tempDir = Directory.systemTemp;
-      final tempFile = File('${tempDir.path}/crop.jpg');
-      await tempFile.writeAsBytes(cropped);
+      final tempFile = File('${tempDir.path}/processed.jpg');
+      await tempFile.writeAsBytes(processed);
 
       final run = await _ocr!.recognize(tempFile.path);
       final text = run.results.map((r) => r.text).join('\n');
@@ -155,8 +185,13 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 20),
               if (_croppedBytes != null)
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Image.memory(_croppedBytes!, width: 300),
+                  padding: const EdgeInsets.all(8.0),
+                  child: Image.memory(_croppedBytes!, width: 200),
+                ),
+              if (_processedBytes != null)
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Image.memory(_processedBytes!, width: 200),
                 ),
               if (_ocrText.isNotEmpty)
                 Padding(
