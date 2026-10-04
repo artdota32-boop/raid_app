@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:snapframes/snapframes.dart';
 import 'package:image/image.dart' as img;
-import 'package:paddle_ocr_native/paddle_ocr_native.dart';
+import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -35,27 +35,6 @@ class _HomePageState extends State<HomePage> {
   Uint8List? _croppedBytes;
   String _status = 'Выбери видео';
   String _ocrText = '';
-  PaddleOcr? _ocr;
-
-  @override
-  void initState() {
-    super.initState();
-    _initOcr();
-  }
-
-  Future<void> _initOcr() async {
-    try {
-      setState(() => _status = 'Инициализация OCR...');
-      _ocr = PaddleOcr();
-      await _ocr!.init(
-        config: const PaddleOcrConfig(language: 'ru'),
-        engine: const EngineConfig(numThreads: 4),
-      );
-      setState(() => _status = 'OCR готов. Выбери видео');
-    } catch (e) {
-      setState(() => _status = 'Ошибка инициализации OCR: $e');
-    }
-  }
 
   Future<void> _pickVideo() async {
     final picker = ImagePicker();
@@ -117,17 +96,20 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _runOcr(Uint8List? cropped) async {
-    if (cropped == null || _ocr == null) return;
+    if (cropped == null) return;
     try {
       final tempDir = Directory.systemTemp;
       final tempFile = File('${tempDir.path}/crop.jpg');
       await tempFile.writeAsBytes(cropped);
 
-      final run = await _ocr!.recognize(tempFile.path);
-      final text = run.results.map((r) => r.text).join('\n');
+      final ocr = FlutterPaddleOcrV5();
+      final result = await ocr.recognize(
+        tempFile.path,
+        model: PaddleOcrModel.eslavV5,
+      );
 
       setState(() {
-        _ocrText = text;
+        _ocrText = result.map((r) => r.text).join('\n');
         _status = 'OCR завершён!';
       });
     } catch (e) {
@@ -146,7 +128,7 @@ class _HomePageState extends State<HomePage> {
             children: [
               const SizedBox(height: 20),
               ElevatedButton.icon(
-                onPressed: _status.contains('OCR готов') ? _pickVideo : null,
+                onPressed: _pickVideo,
                 icon: const Icon(Icons.video_library),
                 label: const Text('Выбрать видео'),
               ),
@@ -156,7 +138,7 @@ class _HomePageState extends State<HomePage> {
               if (_croppedBytes != null)
                 Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Image.memory(_croppedBytes!, width: 300),
+                  child: Image.memory(_croppedBytes!, width: 200),
                 ),
               if (_ocrText.isNotEmpty)
                 Padding(
