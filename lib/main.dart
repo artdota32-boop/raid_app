@@ -92,7 +92,7 @@ class _HomePageState extends State<HomePage> {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
 
-    final xStart = 230;
+    final xStart = 210;
     final yStart = 420;
     final xEnd = 460;
     final yEnd = 490;
