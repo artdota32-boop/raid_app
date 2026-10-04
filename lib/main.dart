@@ -88,6 +88,25 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Uint8List? _filterPurple(Uint8List bytes) {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return null;
+    for (var y = 0; y < decoded.height; y++) {
+      for (var x = 0; x < decoded.width; x++) {
+        final pixel = decoded.getPixel(x, y);
+        final r = pixel.r.toInt();
+        final g = pixel.g.toInt();
+        final b = pixel.b.toInt();
+        if (!(r > 100 Uint8List? _cropRightPart(Uint8List bytes) {Uint8List? _cropRightPart(Uint8List bytes) { b > 150 Uint8List? _cropRightPart(Uint8List bytes) {Uint8List? _cropRightPart(Uint8List bytes) { g < 120)) {
+          decoded.setPixelRgb(x, y, 0, 0, 0);
+        } else {
+          decoded.setPixelRgb(x, y, 255, 255, 255);
+        }
+      }
+    }
+    return Uint8List.fromList(img.encodeJpg(decoded, quality: 95));
+  }
+
   Uint8List? _cropRightPart(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
@@ -144,7 +163,8 @@ class _HomePageState extends State<HomePage> {
       );
 
       final results = await ocr.recognize(cropped);
-      final rightResults = rightPart != null ? await ocr.recognize(rightPart) : <OcrResult>[];
+      final filteredRight = _filterPurple(rightPart);
+      final rightResults = filteredRight != null ? await ocr.recognize(filteredRight) : <OcrResult>[];
 
       // СОРТИРОВКА ПО Y (сверху вниз)
       final allResults = [...results, ...rightResults];
