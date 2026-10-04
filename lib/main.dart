@@ -123,7 +123,8 @@ class _HomePageState extends State<HomePage> {
       );
 
       final results = await ocr.recognize(cropped);
-      final text = results.map((r) => r.text).join('\n');
+      final text = results.map((r) => r.text).join("\n");
+      await ocr.dispose();
 
       setState(() {
         _ocrText = text;
