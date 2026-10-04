@@ -48,7 +48,7 @@ class _HomePageState extends State<HomePage> {
       setState(() => _status = 'Инициализация OCR...');
       _ocr = PaddleOcr();
       await _ocr!.init(
-        config: const PaddleOcrConfig(),
+        config: const PaddleOcrConfig(language: 'ru'),
         engine: const EngineConfig(numThreads: 4),
       );
       setState(() => _status = 'OCR готов. Выбери видео');
