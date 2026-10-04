@@ -98,18 +98,19 @@ class _HomePageState extends State<HomePage> {
   Future<void> _runOcr(Uint8List? cropped) async {
     if (cropped == null) return;
     try {
-      final tempDir = Directory.systemTemp;
-      final tempFile = File('${tempDir.path}/crop.jpg');
-      await tempFile.writeAsBytes(cropped);
-
-      final ocr = FlutterPaddleOcrV5();
-      final result = await ocr.recognize(
-        tempFile.path,
-        model: PaddleOcrModel.eslavV5,
+      final ocr = await PaddleOcr.create(
+        source: ModelSource.filePaths(
+          det: '/absolute/path/det.onnx',
+          rec: '/absolute/path/rec.onnx',
+          dict: '/absolute/path/dict.txt',
+        ),
       );
 
+      final results = await ocr.recognize(cropped);
+      final text = results.map((r) => r.text).join('\n');
+
       setState(() {
-        _ocrText = result.map((r) => r.text).join('\n');
+        _ocrText = text;
         _status = 'OCR завершён!';
       });
     } catch (e) {
