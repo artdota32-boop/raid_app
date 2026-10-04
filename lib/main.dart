@@ -81,7 +81,8 @@ class _HomePageState extends State<HomePage> {
         _croppedBytes = cropped;
         _status = 'Кадр обрезан! Запускаю OCR...';
       });
-      await _runOcr(cropped);
+      final inverted = _invertColors(cropped);
+      await _runOcr(inverted);
     } catch (e) {
       setState(() => _status = 'Ошибка: $e');
     }
@@ -105,6 +106,14 @@ class _HomePageState extends State<HomePage> {
     );
 
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
+  }
+
+  Uint8List? _invertColors(Uint8List? bytes) {
+    if (bytes == null) return null;
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return null;
+    final inverted = img.invert(decoded);
+    return Uint8List.fromList(img.encodeJpg(inverted, quality: 95));
   }
 
   Future<void> _runOcr(Uint8List? cropped) async {
