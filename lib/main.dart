@@ -92,10 +92,10 @@ class _HomePageState extends State<HomePage> {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
 
-    final xStart = 250;
-    final yStart = 430;
+    final xStart = 230;
+    final yStart = 420;
     final xEnd = 460;
-    final yEnd = 470;
+    final yEnd = 490;
 
     final cropped = img.copyCrop(
       decoded,
