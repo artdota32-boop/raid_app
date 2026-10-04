@@ -5,6 +5,8 @@ import 'package:image/image.dart' as img;
 import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:path_provider/path_provider.dart';
 
 void main() {
   runApp(const MyApp());
@@ -35,6 +37,16 @@ class _HomePageState extends State<HomePage> {
   Uint8List? _croppedBytes;
   String _status = 'Выбери видео';
   String _ocrText = '';
+
+  Future<String> _copyAssetToFile(String assetPath, String fileName) async {
+    final tempDir = await getTemporaryDirectory();
+    final file = File('${tempDir.path}/$fileName');
+    if (!await file.exists()) {
+      final data = await rootBundle.load(assetPath);
+      await file.writeAsBytes(data.buffer.asUint8List());
+    }
+    return file.path;
+  }
 
   Future<void> _pickVideo() async {
     final picker = ImagePicker();
@@ -98,11 +110,15 @@ class _HomePageState extends State<HomePage> {
   Future<void> _runOcr(Uint8List? cropped) async {
     if (cropped == null) return;
     try {
+      final detPath = await _copyAssetToFile('assets/models/det.onnx', 'det.onnx');
+      final recPath = await _copyAssetToFile('assets/models/rec.onnx', 'rec.onnx');
+      final dictPath = await _copyAssetToFile('assets/models/dict.txt', 'dict.txt');
+
       final ocr = await PaddleOcr.create(
         source: ModelSource.filePaths(
-          det: 'assets/models/det.onnx',
-          rec: 'assets/models/rec.onnx',
-          dict: 'assets/models/dict.txt',
+          det: detPath,
+          rec: recPath,
+          dict: dictPath,
         ),
       );
 
