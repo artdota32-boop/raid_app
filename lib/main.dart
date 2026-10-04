@@ -147,7 +147,13 @@ class _HomePageState extends State<HomePage> {
       final rightResults = rightPart != null ? await ocr.recognize(rightPart) : <OcrResult>[];
 
       // СОРТИРОВКА ПО Y (сверху вниз)
-      final allResults = [...results, ...rightResults];
+      final rightSorted = List<OcrResult>.from(rightResults);
+      rightSorted.sort((a, b) {
+        final aY = a.points.isEmpty ? 0.0 : a.points.first.dy;
+        final bY = b.points.isEmpty ? 0.0 : b.points.first.dy;
+        return aY.compareTo(bY);
+      });
+      final allResults = [...results, ...rightSorted];
       final sorted = List<OcrResult>.from(allResults);
       sorted.sort((a, b) {
         final aY = a.points.isEmpty ? 0.0 : a.points.first.dy;
