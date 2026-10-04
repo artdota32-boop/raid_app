@@ -77,14 +77,35 @@ class _HomePageState extends State<HomePage> {
         return;
       }
       final cropped = _cropBottomLeft(bytes);
+      final rightPart = _cropRightPart(bytes);
       setState(() {
         _croppedBytes = cropped;
         _status = 'Кадр обрезан! Запускаю OCR...';
       });
-      await _runOcr(cropped);
+      await _runOcr(cropped, rightPart);
     } catch (e) {
       setState(() => _status = 'Ошибка: $e');
     }
+  }
+
+  Uint8List? _cropRightPart(Uint8List bytes) {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return null;
+
+    final xStart = 250;
+    final yStart = 430;
+    final xEnd = 460;
+    final yEnd = 470;
+
+    final cropped = img.copyCrop(
+      decoded,
+      x: xStart,
+      y: yStart,
+      width: xEnd - xStart,
+      height: yEnd - yStart,
+    );
+
+    return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
   Uint8List? _cropBottomLeft(Uint8List bytes) {
@@ -107,7 +128,7 @@ class _HomePageState extends State<HomePage> {
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
-  Future<void> _runOcr(Uint8List? cropped) async {
+  Future<void> _runOcr(Uint8List? cropped, Uint8List? rightPart) async {
     if (cropped == null) return;
     try {
       final detPath = await _copyAssetToFile('assets/models/det.onnx', 'det.onnx');
@@ -123,9 +144,11 @@ class _HomePageState extends State<HomePage> {
       );
 
       final results = await ocr.recognize(cropped);
+      final rightResults = rightPart != null ? await ocr.recognize(rightPart) : <OcrResult>[];
 
       // СОРТИРОВКА ПО Y (сверху вниз)
-      final sorted = List<OcrResult>.from(results);
+      final allResults = [...results, ...rightResults];
+      final sorted = List<OcrResult>.from(allResults);
       sorted.sort((a, b) {
         final aY = a.points.isEmpty ? 0.0 : a.points.first.dy;
         final bY = b.points.isEmpty ? 0.0 : b.points.first.dy;
