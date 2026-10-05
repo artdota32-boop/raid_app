@@ -39,6 +39,8 @@ class _HomePageState extends State<HomePage> {
   String _status = 'Выбери видео';
   String _ocrText = '';
   String _parsedText = '';
+  String _debugLog = '';
+  final List<String> _debugBuffer = [];
 
   Future<String> _copyAssetToFile(String assetPath, String fileName) async {
     final tempDir = await getTemporaryDirectory();
@@ -48,6 +50,42 @@ class _HomePageState extends State<HomePage> {
       await file.writeAsBytes(data.buffer.asUint8List());
     }
     return file.path;
+  }
+
+  // === DEBUG: лог в консоль + буфер + файл ===
+  void _dprint(String line) {
+    print(line);
+    debugPrint(line);
+    _debugBuffer.add(line);
+    if (_debugBuffer.length > 200) _debugBuffer.removeAt(0);
+  }
+
+  Future<void> _writeDebugFile() async {
+    try {
+      final dir = await getExternalStorageDirectory();
+      if (dir == null) return;
+      final f = File('${dir.path}/raid_scanner_debug.txt');
+      await f.writeAsString(_debugBuffer.join('\n'));
+      _dprint('[DEBUG] Файл записан: ${f.path}');
+    } catch (e) {
+      _dprint('[DEBUG] Ошибка записи файла: $e');
+    }
+  }
+
+  void _debugPrintBlock(String tag, int i, OcrResult r) {
+    if (r.points.isEmpty) {
+      _dprint('=== $tag #$i | text="${r.text}" | POINTS EMPTY ===');
+      return;
+    }
+    final xs = r.points.map((p) => p.dx).toList();
+    final ys = r.points.map((p) => p.dy).toList();
+    final minX = xs.reduce((a, b) => a < b ? a : b);
+    final maxX = xs.reduce((a, b) => a > b ? a : b);
+    final minY = ys.reduce((a, b) => a < b ? a : b);
+    final maxY = ys.reduce((a, b) => a > b ? a : b);
+    final cx = (minX + maxX) / 2;
+    final cy = (minY + maxY) / 2;
+    _dprint('=== $tag #$i | text="${r.text}" | conf=${r.confidence.toStringAsFixed(2)} | x[${minX.toStringAsFixed(0)}..${maxX.toStringAsFixed(0)}] y[${minY.toStringAsFixed(0)}..${maxY.toStringAsFixed(0)}] | center=(${cx.toStringAsFixed(0)},${cy.toStringAsFixed(0)}) ===');
   }
 
   Future<void> _pickVideo() async {
@@ -60,6 +98,8 @@ class _HomePageState extends State<HomePage> {
         _croppedBytes = null;
         _ocrText = '';
         _parsedText = '';
+        _debugLog = '';
+        _debugBuffer.clear();
       });
       await _extractFrame();
     }
@@ -95,53 +135,28 @@ class _HomePageState extends State<HomePage> {
   Uint8List? _cropIcon(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
-    final xStart = 113;
-    final yStart = 490;
-    final xEnd = 214;
-    final yEnd = 540;
-    final cropped = img.copyCrop(
-      decoded,
-      x: xStart, y: yStart,
-      width: xEnd - xStart, height: yEnd - yStart,
-    );
+    final cropped = img.copyCrop(decoded,
+        x: 113, y: 490, width: 214 - 113, height: 540 - 490);
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
   Uint8List? _cropRightPart(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
-    final xStart = 252;
-    final yStart = 445;
-    final xEnd = 380;
-    final yEnd = 488;
-    final cropped = img.copyCrop(
-      decoded,
-      x: xStart, y: yStart,
-      width: xEnd - xStart, height: yEnd - yStart,
-    );
+    final cropped = img.copyCrop(decoded,
+        x: 252, y: 445, width: 380 - 252, height: 488 - 445);
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
   Uint8List? _cropBottomLeft(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
-    final xStart = 70;
-    final yStart = 360;
-    final xEnd = 460;
-    final yEnd = 760;
-    final cropped = img.copyCrop(
-      decoded,
-      x: xStart, y: yStart,
-      width: xEnd - xStart, height: yEnd - yStart,
-    );
+    final cropped = img.copyCrop(decoded,
+        x: 70, y: 360, width: 460 - 70, height: 760 - 360);
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
-  Future<void> _runOcr(
-    Uint8List? cropped,
-    Uint8List? rightPart,
-    Uint8List? iconPart,
-  ) async {
+  Future<void> _runOcr(Uint8List? cropped, Uint8List? rightPart, Uint8List? iconPart) async {
     if (cropped == null) return;
     try {
       final detPath = await _copyAssetToFile('assets/models/det.onnx', 'det.onnx');
@@ -149,36 +164,27 @@ class _HomePageState extends State<HomePage> {
       final dictPath = await _copyAssetToFile('assets/models/dict.txt', 'dict.txt');
 
       final ocr = await PaddleOcr.create(
-        source: ModelSource.filePaths(
-          det: detPath,
-          rec: recPath,
-          dict: dictPath,
-        ),
+        source: ModelSource.filePaths(det: detPath, rec: recPath, dict: dictPath),
       );
 
       final results = await ocr.recognize(cropped);
-      final rightResults = rightPart != null
-          ? await ocr.recognize(rightPart)
-          : <OcrResult>[];
-      final iconResults = iconPart != null
-          ? await ocr.recognize(iconPart)
-          : <OcrResult>[];
+      final rightResults = rightPart != null ? await ocr.recognize(rightPart) : <OcrResult>[];
+      final iconResults = iconPart != null ? await ocr.recognize(iconPart) : <OcrResult>[];
 
-      final sorted = List<OcrResult>.from(results)
-        ..sort((a, b) {
-          final aY = a.points.isEmpty ? 0.0 : a.points.first.dy;
-          final bY = b.points.isEmpty ? 0.0 : b.points.first.dy;
-          return aY.compareTo(bY);
-        });
+      final sorted = List<OcrResult>.from(results);
+      final rightSorted = List<OcrResult>.from(rightResults);
 
-      final rightSorted = List<OcrResult>.from(rightResults)
-        ..sort((a, b) {
-          final aY = a.points.isEmpty ? 0.0 : a.points.first.dy;
-          final bY = b.points.isEmpty ? 0.0 : b.points.first.dy;
-          return aY.compareTo(bY);
-        });
+      // === DEBUG ВЫВОД ===
+      _dprint('########## OCR DEBUG START ##########');
+      _dprint('--- MAIN blocks: ${sorted.length} ---');
+      for (int i = 0; i < sorted.length; i++) _debugPrintBlock('MAIN', i, sorted[i]);
+      _dprint('--- RIGHT blocks: ${rightSorted.length} ---');
+      for (int i = 0; i < rightSorted.length; i++) _debugPrintBlock('RIGHT', i, rightSorted[i]);
+      _dprint('--- ICON blocks: ${iconResults.length} ---');
+      for (int i = 0; i < iconResults.length; i++) _debugPrintBlock('ICON', i, iconResults[i]);
+      _dprint('########## OCR DEBUG END ##########');
+      // === /DEBUG ВЫВОД ===
 
-      // === ПАРСИНГ v3 (с координатами) ===
       final parsed = ArtifactParser.parse(
         sorted,
         rightBlocks: rightSorted,
@@ -197,6 +203,7 @@ class _HomePageState extends State<HomePage> {
 Редкость: ${parsed['rarity'] ?? '?'}
 Уровень: ${parsed['level'] ?? '?'}
 Статы: ${parsed['stats']}
+Проценты: ${parsed['stats_percent'] ?? {}}
 Глифы: ${parsed['glyphs']}
 Бонус сета: ${parsed['set_bonus'] ?? '?'}
 Надето: ${parsed['worn'] ?? '?'}
@@ -205,8 +212,11 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _ocrText = text;
         _parsedText = parsedPretty;
+        _debugLog = _debugBuffer.join('\n');
         _status = 'OCR и парсинг завершены!';
       });
+
+      await _writeDebugFile();
     } catch (e) {
       setState(() => _status = 'Ошибка OCR: $e');
     }
@@ -246,6 +256,18 @@ class _HomePageState extends State<HomePage> {
                   child: Text(
                     'Сырой текст:\n$_ocrText',
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ),
+              if (_debugLog.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    color: Colors.black12,
+                    child: Text(
+                      'DEBUG LOG:\n$_debugLog',
+                      style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
+                    ),
                   ),
                 ),
             ],
