@@ -89,14 +89,14 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Uint8List? _cropRightPart(Uint8List bytes) {
+  Uint8List? _cropIcon(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
 
-    final xStart = 252;
-    final yStart = 445;
-    final xEnd = 380;
-    final yEnd = 488;
+    final xStart = 113;
+    final yStart = 490;
+    final xEnd = 214;
+    final yEnd = 540;
 
     final cropped = img.copyCrop(
       decoded,
@@ -109,14 +109,14 @@ class _HomePageState extends State<HomePage> {
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
-  Uint8List? _cropIcon(Uint8List bytes) {
+  Uint8List? _cropRightPart(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
 
-    final xStart = 113;
-    final yStart = 490;
-    final xEnd = 214;
-    final yEnd = 540;
+    final xStart = 252;
+    final yStart = 445;
+    final xEnd = 380;
+    final yEnd = 488;
 
     final cropped = img.copyCrop(
       decoded,
@@ -166,15 +166,9 @@ class _HomePageState extends State<HomePage> {
 
       final results = await ocr.recognize(cropped);
       final rightResults = rightPart != null ? await ocr.recognize(rightPart) : <OcrResult>[];
+      final iconResults = iconPart != null ? await ocr.recognize(iconPart) : <OcrResult>[];
 
-      // СОРТИРОВКА ПО Y (сверху вниз)
-      final rightSorted = List<OcrResult>.from(rightResults);
-      rightSorted.sort((a, b) {
-        final aY = a.points.isEmpty ? 0.0 : a.points.first.dy;
-        final bY = b.points.isEmpty ? 0.0 : b.points.first.dy;
-        return aY.compareTo(bY);
-      });
-      final allResults = [...results, ...rightSorted];
+      // Сортировка по Y (сверху вниз)
       final sorted = List<OcrResult>.from(results);
       sorted.sort((a, b) {
         final aY = a.points.isEmpty ? 0.0 : a.points.first.dy;
@@ -182,7 +176,18 @@ class _HomePageState extends State<HomePage> {
         return aY.compareTo(bY);
       });
 
-      final text = sorted.map((r) => r.text).join("\n") + "\n" + rightSorted.map((r) => r.text).join("\n") + "\n" + iconResults.map((r) => r.text).join("\n");
+      final rightSorted = List<OcrResult>.from(rightResults);
+      rightSorted.sort((a, b) {
+        final aY = a.points.isEmpty ? 0.0 : a.points.first.dy;
+        final bY = b.points.isEmpty ? 0.0 : b.points.first.dy;
+        return aY.compareTo(bY);
+      });
+
+      final text = sorted.map((r) => r.text).join("\n") +
+          "\n" +
+          rightSorted.map((r) => r.text).join("\n") +
+          "\n" +
+          iconResults.map((r) => r.text).join("\n");
 
       setState(() {
         _ocrText = text;
