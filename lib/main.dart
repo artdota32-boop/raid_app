@@ -52,7 +52,6 @@ class _HomePageState extends State<HomePage> {
     return file.path;
   }
 
-  // === DEBUG: лог в консоль + буфер + файл ===
   void _dprint(String line) {
     print(line);
     debugPrint(line);
@@ -66,9 +65,9 @@ class _HomePageState extends State<HomePage> {
       if (dir == null) return;
       final f = File('${dir.path}/raid_scanner_debug.txt');
       await f.writeAsString(_debugBuffer.join('\n'));
-      _dprint('[DEBUG] Файл записан: ${f.path}');
+      _dprint('[DEBUG] Файл: ${f.path}');
     } catch (e) {
-      _dprint('[DEBUG] Ошибка записи файла: $e');
+      _dprint('[DEBUG] Ошибка файла: $e');
     }
   }
 
@@ -148,11 +147,12 @@ class _HomePageState extends State<HomePage> {
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
+  // v3.3: xEnd 460 -> 480 (чтобы 143 не резался до 14)
   Uint8List? _cropBottomLeft(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
     final cropped = img.copyCrop(decoded,
-        x: 70, y: 360, width: 460 - 70, height: 760 - 360);
+        x: 70, y: 360, width: 480 - 70, height: 760 - 360);
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
@@ -174,7 +174,6 @@ class _HomePageState extends State<HomePage> {
       final sorted = List<OcrResult>.from(results);
       final rightSorted = List<OcrResult>.from(rightResults);
 
-      // === DEBUG ВЫВОД ===
       _dprint('########## OCR DEBUG START ##########');
       _dprint('--- MAIN blocks: ${sorted.length} ---');
       for (int i = 0; i < sorted.length; i++) _debugPrintBlock('MAIN', i, sorted[i]);
@@ -183,7 +182,6 @@ class _HomePageState extends State<HomePage> {
       _dprint('--- ICON blocks: ${iconResults.length} ---');
       for (int i = 0; i < iconResults.length; i++) _debugPrintBlock('ICON', i, iconResults[i]);
       _dprint('########## OCR DEBUG END ##########');
-      // === /DEBUG ВЫВОД ===
 
       final parsed = ArtifactParser.parse(
         sorted,
