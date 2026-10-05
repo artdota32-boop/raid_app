@@ -147,13 +147,16 @@ class _HomePageState extends State<HomePage> {
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
-  // v3.3: xEnd 460 -> 480 (чтобы 143 не резался до 14)
+  // v3.3.2: предобработка — x2 масштаб + контраст
   Uint8List? _cropBottomLeft(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
     final cropped = img.copyCrop(decoded,
         x: 70, y: 360, width: 480 - 70, height: 760 - 360);
-    return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
+    // v3.3.2: x2 resize + контраст
+    final resized = img.copyResize(cropped, width: cropped.width * 2);
+    final contrasted = img.adjustColor(resized, contrast: 1.3);
+    return Uint8List.fromList(img.encodeJpg(contrasted, quality: 95));
   }
 
   Future<void> _runOcr(Uint8List? cropped, Uint8List? rightPart, Uint8List? iconPart) async {
