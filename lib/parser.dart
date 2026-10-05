@@ -1,60 +1,57 @@
 import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 import 'dart:ui';
 
-/// v3.3 — фиксы: replacements, игнор (), stats_percent
+/// v3.3.1 — фикс: (N) не исключает, удаляется из текста; порядок replacements
 class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
   static const double xSplit = 130.0;
 
-  // ===== СЛОВАРЬ ЗАМЕН OCR (РАСШИРЕННЫЙ) =====
-  static const Map<String, String> replacements = {
-    // Скр
-    'cYlwb': 'Скр',
-    'cYlob': 'Зщт',
-    'cowb': 'Зщт',
-    'cYYlowb': 'Скр',
-    'сYlwb': 'Скр',
-    'сYlob': 'Зщт',
-    'сYwb': 'Скр',
-    'cYwb': 'Скр',
-    'cYlowb': 'Скр',
-    'Скb': 'Скр',
-    'Ск(': 'Скр',
-    'Скb(': 'Скр',
-    'Скp': 'Скр',
-    'Скв': 'Скр',
-    // Здр
-    '3др': 'Здр',
-    '3др(': 'Здр(',
-    'Здр(1w': 'Здр(1)',
-    'Здр(1': 'Здр(1)',
-    // Метк
-    'Метв': 'Метк',
-    'МеТ': 'Метк',
-    'Метw': 'Метк',
-    'Метv': 'Метк',
-    'Мет(': 'Метк(',
-    'Мет': 'Метк',
-    // Атк
-    'АТк': 'Атк',
-    'Ат (1': 'Атк(1)',
-    'Атк(1w': 'Атк(1)',
-    'Атк1': 'Атк',
-    'Атк(': 'Атк(',
-    // Крит
-    'сКрит': 'Крит',
-    'Крит. ш(1': 'Крит. ш(1)',
-    'Крит. (1': 'Крит. ш(1)',
-    'Крит. (': 'Крит. ш(',
-    'Крит. у(1': 'Крит. ур(1)',
-    'Крит. у': 'Крит. ур',
+  // ===== REPLACEMENTS (длинные ПЕРВЫМИ!) =====
+  static const List<List<String>> replacementPairs = [
+    // СКР (длинные варианты первыми)
+    ['cYYlowb', 'Скр'],
+    ['cYlowb', 'Скр'],
+    ['cnmYlowb', 'Скр'],
+    ['calowb', 'Скр'],
+    ['cYlwb', 'Скр'],
+    ['cYlob', 'Зщт'],
+    ['cYwb', 'Скр'],
+    ['Скb(', 'Скр('],
+    ['Скb', 'Скр'],
+    ['Скp', 'Скр'],
+    ['Скв', 'Скр'],
+    ['Ск(', 'Скр('],
+    ['cowb', 'Зщт'],
+    // ЗДР
+    ['3др', 'Здр'],
+    ['3Д', 'Здр'],
+    ['Здр(1w', 'Здр(1)'],
+    ['Здр(1', 'Здр(1)'],
+    // МЕТК
+    ['Метw', 'Метк'],
+    ['Метv', 'Метк'],
+    ['Метв', 'Метк'],
+    ['МеТ', 'Метк'],
+    ['Мет(', 'Метк('],
+    ['Мет', 'Метк'],
+    // АТК
+    ['Атк(1w', 'Атк(1)'],
+    ['Атк(1', 'Атк(1)'],
+    ['Атк1', 'Атк'],
+    ['АТк', 'Атк'],
+    // КРИТ
+    ['Крит. ш(1', 'Крит. ш(1)'],
+    ['Крит. у(1', 'Крит. ур(1)'],
+    ['Крит. (1', 'Крит. ш(1)'],
+    ['Крит. (', 'Крит. ш('],
+    ['сКрит', 'Крит'],
     // Прочее
-    'Суровостьw': 'Суровость',
-    'Небеснаяскорость': 'Небесная скорость',
-    'ИТ.Ш': '',
-    'ИТЛ': '',
-  };
+    ['Суровостьw', 'Суровость'],
+    ['Небеснаяскорость', 'Небесная скорость'],
+    ['ИТ.Ш', ''],
+    ['ИТЛ', ''],
+  ];
 
   static const List<String> types = [
     'Доспех', 'Оружие', 'Шлем', 'Перчатки', 'Сапоги',
@@ -69,12 +66,22 @@ class ArtifactParser {
     'Метк', 'Крит. ш', 'Крит. ур', 'Атк', 'Здр', 'Скр', 'Зщт', 'Сопр'
   ];
 
+  // ===== ЗАМЕНЫ =====
+  static String _applyReplacements(String text) {
+    String result = text;
+    for (final pair in replacementPairs) {
+      result = result.replaceAll(pair[0], pair[1]);
+    }
+    return result;
+  }
+
   static String _cleanText(String text) {
-    String clean = text;
-    replacements.forEach((old, newVal) {
-      clean = clean.replaceAll(old, newVal);
-    });
-    return clean.trim();
+    return _applyReplacements(text).trim();
+  }
+
+  /// Удаляет (N) — глиф, не часть стата
+  static String _stripGlyphMarkers(String text) {
+    return text.replaceAll(RegExp(r'\(\d+\)?'), '').trim();
   }
 
   static double _minX(OcrResult r) {
@@ -99,26 +106,28 @@ class ArtifactParser {
 
   static double _centerY(OcrResult r) => (_minY(r) + _maxY(r)) / 2;
 
-  /// Ищет название стата. Возвращает null, если блок содержит '(' (метка)
+  /// Ищет название стата. (N) — НЕ мешает.
   static String? _findStatName(OcrResult r) {
     final text = _cleanText(r.text);
     if (text.isEmpty) return null;
-    // Блок с '(' — это метка типа Здр(1), Атк(2) — не считаем за основной стат
-    if (text.contains('(')) return null;
+    // Убираем (N) — глиф
+    final cleaned = _stripGlyphMarkers(text);
+    if (cleaned.isEmpty) return null;
     for (final stat in statNames) {
-      if (text.contains(stat)) return stat;
+      if (cleaned.contains(stat)) return stat;
     }
     return null;
   }
 
-  /// Проверяет, есть ли в блоке %
+  /// Проверяет, есть ли в блоке % (или , в конце)
   static bool _hasPercent(OcrResult r) {
-    return r.text.contains('%') || _cleanText(r.text).contains('%');
+    final t = _cleanText(r.text);
+    return t.contains('%') || t.endsWith(',');
   }
 
-  /// Извлекает число из блока
+  /// Извлекает число
   static int? _extractNumber(OcrResult r) {
-    final text = _cleanText(r.text);
+    final text = _stripGlyphMarkers(_cleanText(r.text));
     if (text.isEmpty) return null;
     final matches = RegExp(r'\d+').allMatches(text).toList();
     if (matches.isEmpty) return null;
@@ -243,10 +252,8 @@ class ArtifactParser {
         }
       }
 
-      // СТАТЫ — главная логика
       _parseStats(mainBlocks, stats, percents);
 
-      // УРОВЕНЬ из ICON
       if (result['level'] == null && iconBlocks.isNotEmpty) {
         for (final r in iconBlocks) {
           if (r.points.isEmpty) continue;
