@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:snapframes/snapframes.dart';
 import 'package:image/image.dart' as img;
 import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
+import 'parser.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/services.dart' show rootBundle;
@@ -37,6 +38,7 @@ class _HomePageState extends State<HomePage> {
   Uint8List? _croppedBytes;
   String _status = 'Выбери видео';
   String _ocrText = '';
+  String _parsedText = '';
 
   Future<String> _copyAssetToFile(String assetPath, String fileName) async {
     final tempDir = await getTemporaryDirectory();
@@ -57,6 +59,7 @@ class _HomePageState extends State<HomePage> {
         _status = 'Видео выбрано, вырезаю кадр...';
         _croppedBytes = null;
         _ocrText = '';
+        _parsedText = '';
       });
       await _extractFrame();
     }
@@ -168,7 +171,6 @@ class _HomePageState extends State<HomePage> {
       final rightResults = rightPart != null ? await ocr.recognize(rightPart) : <OcrResult>[];
       final iconResults = iconPart != null ? await ocr.recognize(iconPart) : <OcrResult>[];
 
-      // Сортировка по Y (сверху вниз)
       final sorted = List<OcrResult>.from(results);
       sorted.sort((a, b) {
         final aY = a.points.isEmpty ? 0.0 : a.points.first.dy;
@@ -189,9 +191,23 @@ class _HomePageState extends State<HomePage> {
           "\n" +
           iconResults.map((r) => r.text).join("\n");
 
+      // Парсим текст
+      final parsed = ArtifactParser.parse(text);
+      final parsedPretty = '''
+Сет: ${parsed['set'] ?? '?'}
+Тип: ${parsed['type'] ?? '?'}
+Редкость: ${parsed['rarity'] ?? '?'}
+Уровень: ${parsed['level'] ?? '?'}
+Статы: ${parsed['stats']}
+Глифы: ${parsed['glyphs']}
+Бонус сета: ${parsed['set_bonus'] ?? '?'}
+Надето: ${parsed['worn'] ?? '?'}
+''';
+
       setState(() {
         _ocrText = text;
-        _status = 'OCR завершён!';
+        _parsedText = parsedPretty;
+        _status = 'OCR и парсинг завершены!';
       });
     } catch (e) {
       setState(() => _status = 'Ошибка OCR: $e');
@@ -221,12 +237,20 @@ class _HomePageState extends State<HomePage> {
                   padding: const EdgeInsets.all(16.0),
                   child: Image.memory(_croppedBytes!, width: 200),
                 ),
+              if (_parsedText.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    _parsedText,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
               if (_ocrText.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Text(
-                    _ocrText,
-                    style: const TextStyle(fontSize: 14),
+                    'Сырой текст:\n$_ocrText',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ),
             ],
