@@ -78,11 +78,12 @@ class _HomePageState extends State<HomePage> {
       }
       final cropped = _cropBottomLeft(bytes);
       final rightPart = _cropRightPart(bytes);
+      final iconPart = _cropIcon(bytes);
       setState(() {
         _croppedBytes = cropped;
         _status = 'Кадр обрезан! Запускаю OCR...';
       });
-      await _runOcr(cropped, rightPart);
+      await _runOcr(cropped, rightPart, iconPart);
     } catch (e) {
       setState(() => _status = 'Ошибка: $e');
     }
@@ -96,6 +97,26 @@ class _HomePageState extends State<HomePage> {
     final yStart = 445;
     final xEnd = 380;
     final yEnd = 488;
+
+    final cropped = img.copyCrop(
+      decoded,
+      x: xStart,
+      y: yStart,
+      width: xEnd - xStart,
+      height: yEnd - yStart,
+    );
+
+    return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
+  }
+
+  Uint8List? _cropIcon(Uint8List bytes) {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return null;
+
+    final xStart = 113;
+    final yStart = 490;
+    final xEnd = 214;
+    final yEnd = 540;
 
     final cropped = img.copyCrop(
       decoded,
@@ -128,7 +149,7 @@ class _HomePageState extends State<HomePage> {
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
-  Future<void> _runOcr(Uint8List? cropped, Uint8List? rightPart) async {
+  Future<void> _runOcr(Uint8List? cropped, Uint8List? rightPart, Uint8List? iconPart) async {
     if (cropped == null) return;
     try {
       final detPath = await _copyAssetToFile('assets/models/det.onnx', 'det.onnx');
@@ -161,7 +182,7 @@ class _HomePageState extends State<HomePage> {
         return aY.compareTo(bY);
       });
 
-      final text = sorted.map((r) => r.text).join("\n") + "\n" + rightSorted.map((r) => r.text).join("\n");
+      final text = sorted.map((r) => r.text).join("\n") + "\n" + rightSorted.map((r) => r.text).join("\n") + "\n" + iconResults.map((r) => r.text).join("\n");
 
       setState(() {
         _ocrText = text;
