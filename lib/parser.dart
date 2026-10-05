@@ -1,18 +1,19 @@
-// Парсер сырого текста OCR для артефактов Raid
+import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
+import 'dart:ui';
+
 class ArtifactParser {
+  static const double yThreshold = 12.0;
+  static const double xGapThreshold = 20.0;
+
   static const Map<String, String> replacements = {
     'cYlwb': 'Скр',
     'cYlob': 'Зщт',
     'cowb': 'Зщт',
-    'yyy': '',
-    'уу': '',
+    'cYYlowb': 'Скр',
     'Метв': 'Метк',
     'Мет': 'Метк',
     '3др': 'Здр',
-    'Здр(1w': 'Здр(1)',
-    'Здр(1': 'Здр(1)',
-    'Ат (1': 'Атк(1)',
-    'Атк(1w': 'Атк(1)',
+    'Атк1': 'Атк',
     'сКрит': 'Крит',
   };
 
@@ -26,22 +27,72 @@ class ArtifactParser {
   ];
 
   static const List<String> statNames = [
-    'Метк', 'Крит. ш', 'Крит. ур', 'Атк', 'Здр', 'Скр', 'Зщт', 'Сопр'
+    'Метк', 'Крит. ш', 'Крит. ур', 'Атк', 'Здр', 'Скр', 'Зщт', 'Сопр', 'Крит'
   ];
 
-  static Map<String, dynamic> parse(String rawText) {
-    // Чистим текст
-    String clean = rawText;
+  static String _cleanText(String text) {
+    String clean = text;
     replacements.forEach((old, newVal) {
       clean = clean.replaceAll(old, newVal);
     });
+    return clean.trim();
+  }
 
-    final lines = clean
-        .split('\n')
-        .map((l) => l.trim())
-        .where((l) => l.isNotEmpty)
-        .toList();
+  static double _minX(OcrResult r) =>
+      r.points.map((p) => p.dx).reduce((a, b) => a < b ? a : b);
+  static double _maxX(OcrResult r) =>
+      r.points.map((p) => p.dx).reduce((a, b) => a > b ? a : b);
+  static double _minY(OcrResult r) =>
+      r.points.map((p) => p.dy).reduce((a, b) => a < b ? a : b);
+  static double _maxY(OcrResult r) =>
+      r.points.map((p) => p.dy).reduce((a, b) => a > b ? a : b);
+  static double _centerY(OcrResult r) => (_minY(r) + _maxY(r)) / 2;
 
+  static List<List<OcrResult>> _groupByRows(List<OcrResult> blocks) {
+    if (blocks.isEmpty) return [];
+    final sorted = List<OcrResult>.from(blocks)
+      ..sort((a, b) => _centerY(a).compareTo(_centerY(b)));
+    final rows = <List<OcrResult>>[];
+    for (final r in sorted) {
+      if (rows.isEmpty) { rows.add([r]); continue; }
+      final lastRow = rows.last;
+      final lastY = lastRow.map(_centerY).reduce((a, b) => a + b) / lastRow.length;
+      if ((_centerY(r) - lastY).abs() < yThreshold) {
+        lastRow.add(r);
+      } else {
+        rows.add([r]);
+      }
+    }
+    return rows;
+  }
+
+  static String _mergeRow(List<OcrResult> row) {
+    final sorted = List<OcrResult>.from(row)
+      ..sort((a, b) => _minX(a).compareTo(_minX(b)));
+    final buf = StringBuffer();
+    double? prevMaxX;
+    for (final r in sorted) {
+      final text = _cleanText(r.text);
+      if (text.isEmpty) continue;
+      if (prevMaxX != null) {
+        final gap = _minX(r) - prevMaxX;
+        buf.write(gap < xGapThreshold ? '' : ' ');
+      }
+      buf.write(text);
+      prevMaxX = _maxX(r);
+    }
+    return buf.toString().trim();
+  }
+
+  static String _mergeDigits(String input) {
+    return input.replaceAll(RegExp(r'(?<=\d)\s+(?=\d)'), '');
+  }
+
+  static Map<String, dynamic> parse(
+    List<OcrResult> mainBlocks, {
+    List<OcrResult> rightBlocks = const [],
+    List<OcrResult> iconBlocks = const [],
+  }) {
     final result = <String, dynamic>{
       'set': null,
       'type': null,
@@ -53,67 +104,84 @@ class ArtifactParser {
       'worn': null,
     };
 
-    for (int i = 0; i < lines.length; i++) {
-      final line = lines[i];
+    final rows = _groupByRows(mainBlocks);
+    final rowTexts = rows.map(_mergeRow).toList();
 
-      // Тип
+    for (final raw in rowTexts) {
+      final line = _mergeDigits(raw);
+      if (line.isEmpty) continue;
+
       for (final t in types) {
         if (line.contains(t)) result['type'] = t;
       }
-
-      // Редкость
       for (final r in rarities) {
         if (line.contains(r)) result['rarity'] = r;
       }
-
-      // Уровень (+8, +12, +16)
-      final levelMatch = RegExp(r'\+(\d{1,2})\b').firstMatch(line);
-      if (levelMatch != null) {
-        final lvl = int.tryParse(levelMatch.group(1) ?? '');
-        if (lvl != null && [8, 12, 16].contains(lvl)) {
+      final lvlMatch = RegExp(r'\+(\d{1,2})').firstMatch(line);
+      if (lvlMatch != null) {
+        final lvl = int.tryParse(lvlMatch.group(1) ?? '');
+        if (lvl != null && [4, 8, 12, 16].contains(lvl)) {
           result['level'] = lvl;
         }
       }
+      final wornMatch = RegExp(r'Надето[:\s]*(\d+/\d+)').firstMatch(line);
+      if (wornMatch != null) result['worn'] = wornMatch.group(1);
+      final bonusMatch = RegExp(r'Комплект[:\s]*(\d+)\s*шт').firstMatch(line);
+      if (bonusMatch != null) result['set_bonus'] = '${bonusMatch.group(1)} шт.';
+    }
 
-      // Надето
-      final wornMatch = RegExp(r'Надето[:d\s]*(\d+/\d+)').firstMatch(line);
-      if (wornMatch != null) {
-        result['worn'] = wornMatch.group(1);
-      }
+    if (rowTexts.isNotEmpty) {
+      final first = _cleanText(rowTexts.first);
+      if (first.isNotEmpty && result['set'] == null) result['set'] = first;
+    }
 
-      // Бонус сета
-      final bonusMatch = RegExp(r'Комплект[:d\s]*(\d+)\s*шт').firstMatch(line);
-      if (bonusMatch != null) {
-        result['set_bonus'] = '${bonusMatch.group(1)} шт.';
-      }
-
-      // Статы + глифы
+    for (final raw in rowTexts) {
+      final line = _mergeDigits(raw);
       for (final stat in statNames) {
-        if (line.contains(stat) || line.startsWith(stat.substring(0, 3))) {
-          if (i + 1 < lines.length) {
-            final nextLine = lines[i + 1];
-            final glyphMatch = RegExp(r'(\d+)[%]?\+?(\d+)').firstMatch(nextLine);
-            final numMatch = RegExp(r'(\d+)').firstMatch(nextLine);
-
-            if (glyphMatch != null) {
-              final base = int.tryParse(glyphMatch.group(1) ?? '') ?? 0;
-              final glyph = int.tryParse(glyphMatch.group(2) ?? '') ?? 0;
-              (result['stats'] as Map<String, List<int>>).putIfAbsent(stat, () => []).add(base);
-              (result['glyphs'] as Map<String, List<int>>).putIfAbsent(stat, () => []).add(glyph);
-            } else if (numMatch != null) {
-              final val = int.tryParse(numMatch.group(1) ?? '') ?? 0;
-              if (val != 0) {
-                (result['stats'] as Map<String, List<int>>).putIfAbsent(stat, () => []).add(val);
-              }
-            }
+        final pattern = RegExp('${RegExp.escape(stat)}[^\\d]{0,6}(\\d{1,5})');
+        final m = pattern.firstMatch(line);
+        if (m != null) {
+          final val = int.tryParse(m.group(1) ?? '');
+          if (val != null && val > 0) {
+            (result['stats'] as Map<String, List<int>>)
+                .putIfAbsent(stat, () => []).add(val);
           }
           break;
         }
       }
     }
 
-    if (lines.isNotEmpty) {
-      result['set'] = lines[0];
+    if (rightBlocks.isNotEmpty) {
+      final rightRows = _groupByRows(rightBlocks);
+      for (final row in rightRows) {
+        final line = _mergeDigits(_mergeRow(row));
+        for (final stat in statNames) {
+          if (line.contains(stat)) {
+            final m = RegExp(r'(\d{1,4})').firstMatch(line);
+            if (m != null) {
+              final val = int.tryParse(m.group(1) ?? '');
+              if (val != null && val > 0) {
+                (result['glyphs'] as Map<String, List<int>>)
+                    .putIfAbsent(stat, () => []).add(val);
+              }
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    if (result['level'] == null && iconBlocks.isNotEmpty) {
+      for (final r in iconBlocks) {
+        final m = RegExp(r'\+?(\d{1,2})').firstMatch(_cleanText(r.text));
+        if (m != null) {
+          final lvl = int.tryParse(m.group(1) ?? '');
+          if (lvl != null && [4, 8, 12, 16].contains(lvl)) {
+            result['level'] = lvl;
+            break;
+          }
+        }
+      }
     }
 
     return result;

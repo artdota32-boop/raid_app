@@ -95,64 +95,53 @@ class _HomePageState extends State<HomePage> {
   Uint8List? _cropIcon(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
-
     final xStart = 113;
     final yStart = 490;
     final xEnd = 214;
     final yEnd = 540;
-
     final cropped = img.copyCrop(
       decoded,
-      x: xStart,
-      y: yStart,
-      width: xEnd - xStart,
-      height: yEnd - yStart,
+      x: xStart, y: yStart,
+      width: xEnd - xStart, height: yEnd - yStart,
     );
-
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
   Uint8List? _cropRightPart(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
-
     final xStart = 252;
     final yStart = 445;
     final xEnd = 380;
     final yEnd = 488;
-
     final cropped = img.copyCrop(
       decoded,
-      x: xStart,
-      y: yStart,
-      width: xEnd - xStart,
-      height: yEnd - yStart,
+      x: xStart, y: yStart,
+      width: xEnd - xStart, height: yEnd - yStart,
     );
-
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
   Uint8List? _cropBottomLeft(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
-
     final xStart = 70;
     final yStart = 360;
     final xEnd = 460;
     final yEnd = 760;
-
     final cropped = img.copyCrop(
       decoded,
-      x: xStart,
-      y: yStart,
-      width: xEnd - xStart,
-      height: yEnd - yStart,
+      x: xStart, y: yStart,
+      width: xEnd - xStart, height: yEnd - yStart,
     );
-
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
-  Future<void> _runOcr(Uint8List? cropped, Uint8List? rightPart, Uint8List? iconPart) async {
+  Future<void> _runOcr(
+    Uint8List? cropped,
+    Uint8List? rightPart,
+    Uint8List? iconPart,
+  ) async {
     if (cropped == null) return;
     try {
       final detPath = await _copyAssetToFile('assets/models/det.onnx', 'det.onnx');
@@ -168,22 +157,33 @@ class _HomePageState extends State<HomePage> {
       );
 
       final results = await ocr.recognize(cropped);
-      final rightResults = rightPart != null ? await ocr.recognize(rightPart) : <OcrResult>[];
-      final iconResults = iconPart != null ? await ocr.recognize(iconPart) : <OcrResult>[];
+      final rightResults = rightPart != null
+          ? await ocr.recognize(rightPart)
+          : <OcrResult>[];
+      final iconResults = iconPart != null
+          ? await ocr.recognize(iconPart)
+          : <OcrResult>[];
 
-      final sorted = List<OcrResult>.from(results);
-      sorted.sort((a, b) {
-        final aY = a.points.isEmpty ? 0.0 : a.points.first.dy;
-        final bY = b.points.isEmpty ? 0.0 : b.points.first.dy;
-        return aY.compareTo(bY);
-      });
+      final sorted = List<OcrResult>.from(results)
+        ..sort((a, b) {
+          final aY = a.points.isEmpty ? 0.0 : a.points.first.dy;
+          final bY = b.points.isEmpty ? 0.0 : b.points.first.dy;
+          return aY.compareTo(bY);
+        });
 
-      final rightSorted = List<OcrResult>.from(rightResults);
-      rightSorted.sort((a, b) {
-        final aY = a.points.isEmpty ? 0.0 : a.points.first.dy;
-        final bY = b.points.isEmpty ? 0.0 : b.points.first.dy;
-        return aY.compareTo(bY);
-      });
+      final rightSorted = List<OcrResult>.from(rightResults)
+        ..sort((a, b) {
+          final aY = a.points.isEmpty ? 0.0 : a.points.first.dy;
+          final bY = b.points.isEmpty ? 0.0 : b.points.first.dy;
+          return aY.compareTo(bY);
+        });
+
+      // === ПАРСИНГ v3 (с координатами) ===
+      final parsed = ArtifactParser.parse(
+        sorted,
+        rightBlocks: rightSorted,
+        iconBlocks: iconResults,
+      );
 
       final text = sorted.map((r) => r.text).join("\n") +
           "\n" +
@@ -191,8 +191,6 @@ class _HomePageState extends State<HomePage> {
           "\n" +
           iconResults.map((r) => r.text).join("\n");
 
-      // Парсим текст
-      final parsed = ArtifactParser.parse(text);
       final parsedPretty = '''
 Сет: ${parsed['set'] ?? '?'}
 Тип: ${parsed['type'] ?? '?'}
@@ -240,10 +238,7 @@ class _HomePageState extends State<HomePage> {
               if (_parsedText.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    _parsedText,
-                    style: const TextStyle(fontSize: 14),
-                  ),
+                  child: Text(_parsedText, style: const TextStyle(fontSize: 14)),
                 ),
               if (_ocrText.isNotEmpty)
                 Padding(
