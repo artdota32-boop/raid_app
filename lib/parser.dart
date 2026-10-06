@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 
-/// v3.3.11 — ОТЛАДКА: print в _findStatName для "Мет"
+/// v3.3.12 — ОТЛАДКА: print для каждого блока в цикле _parseStats
 class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
@@ -104,23 +104,11 @@ class ArtifactParser {
 
   static String? _findStatName(OcrResult r) {
     final text = _cleanText(r.text);
-    // ОТЛАДКА для "Мет"
-    if (r.text.contains('Мет') || r.text.contains('Мет')) {
-      print('[FINDSTAT] raw="${r.text}" clean="$text"');
-    }
     if (text.isEmpty) return null;
     final cleaned = _stripGlyphMarkers(text);
     if (cleaned.isEmpty) return null;
     for (final stat in statNames) {
-      if (cleaned.contains(stat)) {
-        if (r.text.contains('Мет') || r.text.contains('Мет')) {
-          print('[FINDSTAT] MATCH: raw="${r.text}" → stat=$stat');
-        }
-        return stat;
-      }
-    }
-    if (r.text.contains('Мет') || r.text.contains('Мет')) {
-      print('[FINDSTAT] NO MATCH for raw="${r.text}" clean="$text" cleaned="$cleaned"');
+      if (cleaned.contains(stat)) return stat;
     }
     return null;
   }
@@ -160,7 +148,13 @@ class ArtifactParser {
     final leftBlocks = <OcrResult>[];
     final rightBlocks = <OcrResult>[];
 
-    for (final r in mainBlocks) {
+    for (int idx = 0; idx < mainBlocks.length; idx++) {
+      final r = mainBlocks[idx];
+      final ptsLen = r.points.length;
+      final cyVal = ptsLen > 0 ? _centerY(r) : -1.0;
+      final cxVal = ptsLen > 0 ? _centerX(r) : -1.0;
+      print('[PARSER-ITER] #$idx raw="${r.text}" points=$ptsLen cx=$cxVal cy=$cyVal');
+
       if (r.points.isEmpty) continue;
       final cy = _centerY(r);
       if (cy > yMinForStats) continue;
