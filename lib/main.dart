@@ -147,18 +147,14 @@ class _HomePageState extends State<HomePage> {
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
-  // v3.3.6: binarize + invert (чёрный текст на белом) + x2
+  // v3.3.7: без binarize, только x2 масштаб
   Uint8List? _cropBottomLeft(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
     final cropped = img.copyCrop(decoded,
         x: 70, y: 360, width: 480 - 70, height: 760 - 360);
-    // v3.3.6: grayscale + binarize (0.5) + invert
-    final gray = img.grayscale(cropped);
-    final bw = img.luminanceThreshold(gray, threshold: 0.5);
-    final inverted = img.invert(bw);
-    // x2 масштаб
-    final resized = img.copyResize(inverted, width: inverted.width * 2);
+    // v3.3.7: только x2, без binarize/invert
+    final resized = img.copyResize(cropped, width: cropped.width * 2);
     return Uint8List.fromList(img.encodeJpg(resized, quality: 95));
   }
 
