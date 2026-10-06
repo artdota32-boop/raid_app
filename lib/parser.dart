@@ -1,15 +1,15 @@
 import 'dart:ui';
 import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 
-/// v3.3.8 — правила: регистронезависимые replacements, приоритет основного стата, игнор кнопок
+/// v3.3.9 — фикс: убрана двойная "к" (Мет → Меткк), добавлен Ат → Атк
 class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
   static const double xSplit = 130.0;
-  static const double yMaxForSet = 100.0;  // сет — только верх
-  static const double yMinForStats = 400.0; // статы — до этой Y
+  static const double yMaxForSet = 200.0;
+  static const double yMinForStats = 400.0;
 
-  // ===== REPLACEMENTS (длинные ПЕРВЫМИ) =====
+  // ===== REPLACEMENTS (длинные ПЕРВЫМИ, БЕЗ "Мет") =====
   static const List<List<String>> replacementPairs = [
     // СКР
     ['cYYlowb', 'Скр'],
@@ -31,13 +31,12 @@ class ArtifactParser {
     ['3Д', 'Здр'],
     ['Здр(1w', 'Здр(1)'],
     ['Здр(1', 'Здр(1)'],
-    // МЕТК
+    // МЕТК — БЕЗ ['Мет', 'Метк'] !!!
     ['Метw', 'Метк'],
     ['Метv', 'Метк'],
     ['Метв', 'Метк'],
     ['МеТ', 'Метк'],
     ['Мет(', 'Метк('],
-    ['Мет', 'Метк'],
     // АТК
     ['Атк(1w', 'Атк(1)'],
     ['Атк(1', 'Атк(1)'],
@@ -70,12 +69,13 @@ class ArtifactParser {
     'Метк', 'Крит. ш', 'Крит. ур', 'Атк', 'Здр', 'Скр', 'Зщт', 'Сопр'
   ];
 
-  // ===== ЗАМЕНЫ =====
   static String _applyReplacements(String text) {
     String result = text;
     for (final pair in replacementPairs) {
       result = result.replaceAll(pair[0], pair[1]);
     }
+    // Ат → Атк (только отдельное слово)
+    result = result.replaceAll(RegExp(r'\bАт\b'), 'Атк');
     return result;
   }
 
@@ -83,7 +83,6 @@ class ArtifactParser {
     return _applyReplacements(text).trim();
   }
 
-  /// Удаляет (N) — глиф, не часть стата
   static String _stripGlyphMarkers(String text) {
     return text.replaceAll(RegExp(r'\(\d+\)?'), '').trim();
   }
@@ -111,7 +110,6 @@ class ArtifactParser {
   static double _centerY(OcrResult r) => (_minY(r) + _maxY(r)) / 2;
   static double _centerX(OcrResult r) => (_minX(r) + _maxX(r)) / 2;
 
-  /// Ищет название стата. (N) — НЕ мешает.
   static String? _findStatName(OcrResult r) {
     final text = _cleanText(r.text);
     if (text.isEmpty) return null;
@@ -159,7 +157,6 @@ class ArtifactParser {
     for (final r in mainBlocks) {
       if (r.points.isEmpty) continue;
       final cy = _centerY(r);
-      // Игнорируем блоки ниже Y=400 (кнопки, описание)
       if (cy > yMinForStats) continue;
       final cx = _centerX(r);
       final text = _cleanText(r.text);
@@ -249,7 +246,9 @@ class ArtifactParser {
         result['set_bonus'] = '${bonusMatch.group(1)} шт.';
       }
 
-      // v3.3.8: Сет — ТОЛЬКО блок с Y < 100 (верх карточки), не кнопки
+      // Сет — самый ВЕРХНИЙ блок (min Y), не кнопки
+      OcrResult? topBlock;
+      double minY = double.infinity;
       for (final r in mainBlocks) {
         if (r.points.isEmpty) continue;
         final cy = _centerY(r);
@@ -258,10 +257,14 @@ class ArtifactParser {
         if (text.isEmpty) continue;
         if (types.contains(text)) continue;
         if (rarities.contains(text)) continue;
-        // Игнорируем кнопки
         if (text.contains('Улучшить') || text.contains('Надеть')) continue;
-        result['set'] = text;
-        break;
+        if (cy < minY) {
+          minY = cy;
+          topBlock = r;
+        }
+      }
+      if (topBlock != null) {
+        result['set'] = _cleanText(topBlock.text);
       }
 
       _parseStats(mainBlocks, stats, percents);
