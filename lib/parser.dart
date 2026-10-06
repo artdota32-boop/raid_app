@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 
-/// v3.3.9 — фикс: убрана двойная "к" (Мет → Меткк), добавлен Ат → Атк
+/// v3.3.10 — ОТЛАДКА: print в _parseStats для диагностики
 class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
@@ -9,9 +9,7 @@ class ArtifactParser {
   static const double yMaxForSet = 200.0;
   static const double yMinForStats = 400.0;
 
-  // ===== REPLACEMENTS (длинные ПЕРВЫМИ, БЕЗ "Мет") =====
   static const List<List<String>> replacementPairs = [
-    // СКР
     ['cYYlowb', 'Скр'],
     ['cYlowb', 'Скр'],
     ['cnmYlowb', 'Скр'],
@@ -26,30 +24,25 @@ class ArtifactParser {
     ['Ск(', 'Скр('],
     ['Cwb', 'Скр'],
     ['cowb', 'Зщт'],
-    // ЗДР
     ['3др', 'Здр'],
     ['3Д', 'Здр'],
     ['Здр(1w', 'Здр(1)'],
     ['Здр(1', 'Здр(1)'],
-    // МЕТК — БЕЗ ['Мет', 'Метк'] !!!
     ['Метw', 'Метк'],
     ['Метv', 'Метк'],
     ['Метв', 'Метк'],
     ['МеТ', 'Метк'],
     ['Мет(', 'Метк('],
-    // АТК
     ['Атк(1w', 'Атк(1)'],
     ['Атк(1', 'Атк(1)'],
     ['Атк1', 'Атк'],
     ['АТк', 'Атк'],
     ['Ат 1', 'Атк 1'],
-    // КРИТ
     ['Крит. ш(1', 'Крит. ш(1)'],
     ['Крит. у(1', 'Крит. ур(1)'],
     ['Крит. (1', 'Крит. ш(1)'],
     ['Крит. (', 'Крит. ш('],
     ['сКрит', 'Крит'],
-    // Прочее
     ['Суровостьw', 'Суровость'],
     ['Небеснаяскорость', 'Небесная скорость'],
     ['ИТ.Ш', ''],
@@ -74,7 +67,6 @@ class ArtifactParser {
     for (final pair in replacementPairs) {
       result = result.replaceAll(pair[0], pair[1]);
     }
-    // Ат → Атк (только отдельное слово)
     result = result.replaceAll(RegExp(r'\bАт\b'), 'Атк');
     return result;
   }
@@ -151,6 +143,8 @@ class ArtifactParser {
     Map<String, List<int>> statsOut,
     Map<String, List<int>> percentOut,
   ) {
+    print('[PARSER] _parseStats START, mainBlocks=${mainBlocks.length}');
+
     final leftBlocks = <OcrResult>[];
     final rightBlocks = <OcrResult>[];
 
@@ -164,12 +158,16 @@ class ArtifactParser {
       final statName = _findStatName(r);
       if (statName != null && cx < xSplit) {
         leftBlocks.add(r);
+        print('[PARSER] LEFT: raw="${r.text}" clean="$text" stat=$statName cx=$cx cy=$cy');
         continue;
       }
       if (cx >= xSplit && RegExp(r'\d').hasMatch(text)) {
         rightBlocks.add(r);
+        print('[PARSER] RIGHT: raw="${r.text}" clean="$text" cx=$cx cy=$cy');
       }
     }
+
+    print('[PARSER] leftBlocks=${leftBlocks.length} rightBlocks=${rightBlocks.length}');
 
     for (final left in leftBlocks) {
       final statName = _findStatName(left);
@@ -186,9 +184,18 @@ class ArtifactParser {
         }
       }
 
-      if (bestNum == null) continue;
+      if (bestNum == null) {
+        print('[PARSER] NO MATCH for $statName at cy=$leftY');
+        continue;
+      }
+
       final value = _extractNumber(bestNum);
-      if (value == null) continue;
+      if (value == null) {
+        print('[PARSER] NO VALUE for $statName (bestNum="${bestNum.text}")');
+        continue;
+      }
+
+      print('[PARSER] MATCH: $statName = $value (from "${bestNum.text}" dy=$bestDist)');
 
       if (_hasPercent(bestNum)) {
         final list = percentOut.putIfAbsent(statName, () => []);
@@ -198,6 +205,8 @@ class ArtifactParser {
         if (!list.contains(value)) list.add(value);
       }
     }
+
+    print('[PARSER] _parseStats END');
   }
 
   static Map<String, dynamic> parse(
@@ -246,7 +255,6 @@ class ArtifactParser {
         result['set_bonus'] = '${bonusMatch.group(1)} шт.';
       }
 
-      // Сет — самый ВЕРХНИЙ блок (min Y), не кнопки
       OcrResult? topBlock;
       double minY = double.infinity;
       for (final r in mainBlocks) {
