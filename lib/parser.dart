@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 
-/// v3.3.18 — фиксы: (N) в числе, дубли Здр, доп. проверки
+/// v3.3.19 — полный [ITER] лог + 4 фикса
 class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
@@ -95,14 +95,7 @@ class ArtifactParser {
     return _applyReplacements(text).trim();
   }
 
-  /// Удаляет (N) полностью (и цифру и скобки)
   static String _stripGlyphMarkers(String text) {
-    return text.replaceAll(RegExp(r'\(\d+\)?'), '').trim();
-  }
-
-  /// Удаляет "(число" в конце и "(число)" (только скобки с цифрами)
-  static String _stripNumberInParens(String text) {
-    // "Сопр(2)" → "Сопр", "Сопр(2) 28" → "Сопр 28"
     return text.replaceAll(RegExp(r'\(\d+\)?'), '').trim();
   }
 
@@ -145,11 +138,13 @@ class ArtifactParser {
     return t.contains('%') || t.endsWith(',');
   }
 
-  /// Извлекает число. Игнорирует числа в скобках (N) типа "Сопр(2)"
+  /// Извлекает число. Игнорирует (N) в скобках
   static int? _extractNumber(OcrResult r) {
     String text = _cleanText(r.text);
-    // v3.3.18: убираем "(число)" ПОЛНОСТЬЮ (скобки + цифра)
+    // v3.3.19: убираем "(N)" + "N)" + "(N"
     text = text.replaceAll(RegExp(r'\(\d+\)?'), ' ');
+    text = text.replaceAll(RegExp(r'\d+\)'), ' ');
+    text = text.replaceAll(RegExp(r'\(\d+'), ' ');
     text = text.trim();
     if (text.isEmpty) return null;
 
@@ -189,30 +184,55 @@ class ArtifactParser {
     Map<String, List<int>> percentOut,
     List<String> debugOut,
   ) {
+    debugOut.add('[PARSER] _parseStats START, mainBlocks=${mainBlocks.length}');
+
     final leftBlocks = <OcrResult>[];
     final rightBlocks = <OcrResult>[];
 
     for (int idx = 0; idx < mainBlocks.length; idx++) {
       final r = mainBlocks[idx];
-      if (r.points.isEmpty) continue;
+      if (r.points.isEmpty) {
+        debugOut.add('[ITER] #$idx EMPTY raw="${r.text}"');
+        continue;
+      }
       final cy = _centerY(r);
       final cx = _centerX(r);
       final text = _cleanText(r.text);
 
-      if (cy > yMinForStats) continue;
+      debugOut.add('[ITER] #$idx raw="${r.text}" clean="$text" cu=${r.text.codeUnits} cx=$cx cy=$cy');
 
-      if (_isStatWithNumber(r.text)) {
-        leftBlocks.add(r);
+      if (cy > yMinForStats) {
+        debugOut.add('[ITER] #$idx SKIP cy>$yMinForStats');
         continue;
       }
 
+      // Доп-стат в правой части (Метк16 от звёзд)
       final statName = _findStatName(r);
+      if (statName != null && cx >= xSplit && _isStatWithNumber(r.text)) {
+        final val = _extractNumber(r);
+        if (val != null) {
+          debugOut.add('[ITER] #$idx → DOP-STAT $statName = $val (raw="${r.text}")');
+          statsOut.putIfAbsent(statName, () => []).add(val);
+        }
+        continue;
+      }
+
+      if (_isStatWithNumber(r.text) && cx < xSplit) {
+        leftBlocks.add(r);
+        debugOut.add('[ITER] #$idx → LEFT (stat+num)');
+        continue;
+      }
+
       if (statName != null && cx < xSplit) {
         leftBlocks.add(r);
+        debugOut.add('[ITER] #$idx → LEFT stat=$statName');
         continue;
       }
       if (cx >= xSplit && RegExp(r'\d').hasMatch(text)) {
         rightBlocks.add(r);
+        debugOut.add('[ITER] #$idx → RIGHT');
+      } else {
+        debugOut.add('[ITER] #$idx → NEITHER');
       }
     }
 
@@ -241,10 +261,16 @@ class ArtifactParser {
         }
       }
 
-      if (bestNum == null) continue;
+      if (bestNum == null) {
+        debugOut.add('[PARSER] NO MATCH for $statName (raw="${left.text}")');
+        continue;
+      }
 
       final value = _extractNumber(bestNum);
-      if (value == null) continue;
+      if (value == null) {
+        debugOut.add('[PARSER] NO VALUE for $statName (bestNum="${bestNum.text}")');
+        continue;
+      }
 
       debugOut.add('[PARSER] MATCH: $statName = $value (from "${bestNum.text}" dy=$bestDist)');
 
@@ -256,6 +282,8 @@ class ArtifactParser {
         if (!list.contains(value)) list.add(value);
       }
     }
+
+    debugOut.add('[PARSER] _parseStats END');
   }
 
   static Map<String, dynamic> parse(
