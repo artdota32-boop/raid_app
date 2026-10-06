@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 
-/// v3.3.14 — DEBUG в result: codeUnits для "Мет"
+/// v3.3.15 — DEBUG: codeUnits для ВСЕХ блоков в цикле
 class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
@@ -151,26 +151,32 @@ class ArtifactParser {
 
     for (int idx = 0; idx < mainBlocks.length; idx++) {
       final r = mainBlocks[idx];
-      if (r.points.isEmpty) continue;
+      if (r.points.isEmpty) {
+        debugOut.add('[ITER] #$idx EMPTY POINTS raw="${r.text}"');
+        continue;
+      }
       final cy = _centerY(r);
-      if (cy > yMinForStats) continue;
       final cx = _centerX(r);
       final text = _cleanText(r.text);
 
-      if (r.text.contains('Мет')) {
-        debugOut.add('[FINDSTAT] raw="${r.text}" clean="$text" codeUnits=${r.text.codeUnits}');
+      debugOut.add('[ITER] #$idx raw="${r.text}" clean="$text" cu=${r.text.codeUnits} cx=$cx cy=$cy');
+
+      if (cy > yMinForStats) {
+        debugOut.add('[ITER] #$idx SKIP (cy>$yMinForStats)');
+        continue;
       }
 
       final statName = _findStatName(r);
       if (statName != null && cx < xSplit) {
         leftBlocks.add(r);
-        if (r.text.contains('Мет')) {
-          debugOut.add('[FINDSTAT] MATCH: raw="${r.text}" → stat=$statName');
-        }
+        debugOut.add('[ITER] #$idx → LEFT stat=$statName');
         continue;
       }
       if (cx >= xSplit && RegExp(r'\d').hasMatch(text)) {
         rightBlocks.add(r);
+        debugOut.add('[ITER] #$idx → RIGHT');
+      } else {
+        debugOut.add('[ITER] #$idx → NEITHER (cx=$cx, text="$text")');
       }
     }
 
