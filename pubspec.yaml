@@ -10,8 +10,6 @@ dependencies:
   flutter:
     sdk: flutter
   paddle_ocr_native: ^0.1.0
-  flutter_paddle_ocr_v5:
-    path: local_plugins/flutter_paddle_ocr_v5
   image_picker: ^1.0.4
   path_provider: ^2.1.1
   image: ^4.1.0
