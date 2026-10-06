@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 
-/// v3.3.19 — полный [ITER] лог + 4 фикса
+/// v3.3.20 — 8 фиксов: Атк, (N), Скр RIGHT, cYlow, %, двойной пробел, DOP, двойное число
 class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
@@ -22,8 +22,11 @@ class ArtifactParser {
   static const List<List<String>> replacementPairs = [
     ['cYYlowb', 'Скр'],
     ['cYlowb', 'Скр'],
+    ['cnmaYlowb', 'Скр'],
     ['cnmYlowb', 'Скр'],
     ['cmYlowb', 'Скр'],
+    ['caYlowbl', 'Скр'],
+    ['cYlow', 'Скр'],
     ['calowb', 'Скр'],
     ['cYlwb', 'Скр'],
     ['cYlob', 'Зщт'],
@@ -49,7 +52,6 @@ class ArtifactParser {
     ['Атк1', 'Атк'],
     ['АТк', 'Атк'],
     ['Ат 1', 'Атк 1'],
-    ['Ат', 'Атк'],
     ['Крит. ш(1', 'Крит. ш(1)'],
     ['Крит. у(1', 'Крит. ур(1)'],
     ['Крит. (1w', 'Крит. ш(1)'],
@@ -88,6 +90,8 @@ class ArtifactParser {
     for (final pair in replacementPairs) {
       result = result.replaceAll(pair[0], pair[1]);
     }
+    // v3.3.20: Ат → Атк ТОЛЬКО отдельным словом (границы)
+    result = result.replaceAll(RegExp(r'(?<![А-Яа-яЁё])Ат(?![А-Яа-яЁё])'), 'Атк');
     return result;
   }
 
@@ -138,10 +142,8 @@ class ArtifactParser {
     return t.contains('%') || t.endsWith(',');
   }
 
-  /// Извлекает число. Игнорирует (N) в скобках
   static int? _extractNumber(OcrResult r) {
     String text = _cleanText(r.text);
-    // v3.3.19: убираем "(N)" + "N)" + "(N"
     text = text.replaceAll(RegExp(r'\(\d+\)?'), ' ');
     text = text.replaceAll(RegExp(r'\d+\)'), ' ');
     text = text.replaceAll(RegExp(r'\(\d+'), ' ');
@@ -166,13 +168,47 @@ class ArtifactParser {
     return null;
   }
 
+  /// Возвращает ВСЕ числа в блоке
+  static List<int> _extractAllNumbers(OcrResult r) {
+    String text = _cleanText(r.text);
+    text = text.replaceAll(RegExp(r'\(\d+\)?'), ' ');
+    text = text.trim();
+    if (text.isEmpty) return [];
+
+    final matches = RegExp(r'\d+').allMatches(text).toList();
+    final result = <int>[];
+    for (final m in matches) {
+      final val = int.tryParse(m.group(0) ?? '');
+      if (val != null && val >= 10) result.add(val);
+    }
+    return result;
+  }
+
   static bool _isStatWithNumber(String text) {
     final cleaned = _cleanText(text);
     for (final stat in statNames) {
       if (cleaned.startsWith(stat)) {
         final rest = cleaned.substring(stat.length).trim();
         final stripped = rest.replaceAll(RegExp(r'\(\d+\)?'), '').trim();
-        if (RegExp(r'^\d+$').hasMatch(stripped)) return true;
+        if (RegExp(r'^\d+$').hasMatch(stripped)) {
+          // v3.3.20: не считать, если число ≤ 9 (это (N)-номер)
+          final num = int.tryParse(stripped);
+          if (num != null && num <= 9) return false;
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Проверка: блок содержит стат + ДВА числа (основной + доп)
+  static bool _isStatWithTwoNumbers(String text) {
+    final cleaned = _cleanText(text);
+    for (final stat in statNames) {
+      final pattern = RegExp('${RegExp.escape(stat)}[\\s\\d]+');
+      if (pattern.hasMatch(cleaned)) {
+        final matches = RegExp(r'\d+').allMatches(cleaned).toList();
+        if (matches.length >= 2) return true;
       }
     }
     return false;
@@ -182,6 +218,7 @@ class ArtifactParser {
     List<OcrResult> mainBlocks,
     Map<String, List<int>> statsOut,
     Map<String, List<int>> percentOut,
+    Map<String, List<int>> dopStatsOut,
     List<String> debugOut,
   ) {
     debugOut.add('[PARSER] _parseStats START, mainBlocks=${mainBlocks.length}');
@@ -191,48 +228,52 @@ class ArtifactParser {
 
     for (int idx = 0; idx < mainBlocks.length; idx++) {
       final r = mainBlocks[idx];
-      if (r.points.isEmpty) {
-        debugOut.add('[ITER] #$idx EMPTY raw="${r.text}"');
-        continue;
-      }
+      if (r.points.isEmpty) continue;
       final cy = _centerY(r);
       final cx = _centerX(r);
       final text = _cleanText(r.text);
 
-      debugOut.add('[ITER] #$idx raw="${r.text}" clean="$text" cu=${r.text.codeUnits} cx=$cx cy=$cy');
+      if (cy > yMinForStats) continue;
 
-      if (cy > yMinForStats) {
-        debugOut.add('[ITER] #$idx SKIP cy>$yMinForStats');
-        continue;
+      // v3.3.20: стат + ДВА числа в одном блоке
+      if (_isStatWithTwoNumbers(r.text)) {
+        final nums = _extractAllNumbers(r);
+        final statName = _findStatName(r);
+        if (statName != null && nums.length >= 2) {
+          debugOut.add('[ITER] #$idx → TWO-NUM: $statName = ${nums[0]} (dop=${nums[1]})');
+          statsOut.putIfAbsent(statName, () => []).add(nums[0]);
+          dopStatsOut.putIfAbsent(statName, () => []).add(nums[1]);
+          continue;
+        }
       }
 
-      // Доп-стат в правой части (Метк16 от звёзд)
       final statName = _findStatName(r);
+
+      // v3.3.20: DOP-STAT в правой части (Метк16)
       if (statName != null && cx >= xSplit && _isStatWithNumber(r.text)) {
         final val = _extractNumber(r);
         if (val != null) {
-          debugOut.add('[ITER] #$idx → DOP-STAT $statName = $val (raw="${r.text}")');
-          statsOut.putIfAbsent(statName, () => []).add(val);
+          debugOut.add('[ITER] #$idx → DOP-STAT $statName = $val');
+          if (statName == 'Метк') {
+            dopStatsOut.putIfAbsent(statName, () => []).add(val);
+          } else {
+            statsOut.putIfAbsent(statName, () => []).add(val);
+          }
         }
         continue;
       }
 
       if (_isStatWithNumber(r.text) && cx < xSplit) {
         leftBlocks.add(r);
-        debugOut.add('[ITER] #$idx → LEFT (stat+num)');
         continue;
       }
 
       if (statName != null && cx < xSplit) {
         leftBlocks.add(r);
-        debugOut.add('[ITER] #$idx → LEFT stat=$statName');
         continue;
       }
       if (cx >= xSplit && RegExp(r'\d').hasMatch(text)) {
         rightBlocks.add(r);
-        debugOut.add('[ITER] #$idx → RIGHT');
-      } else {
-        debugOut.add('[ITER] #$idx → NEITHER');
       }
     }
 
@@ -262,15 +303,12 @@ class ArtifactParser {
       }
 
       if (bestNum == null) {
-        debugOut.add('[PARSER] NO MATCH for $statName (raw="${left.text}")');
+        debugOut.add('[PARSER] NO MATCH for $statName');
         continue;
       }
 
       final value = _extractNumber(bestNum);
-      if (value == null) {
-        debugOut.add('[PARSER] NO VALUE for $statName (bestNum="${bestNum.text}")');
-        continue;
-      }
+      if (value == null) continue;
 
       debugOut.add('[PARSER] MATCH: $statName = $value (from "${bestNum.text}" dy=$bestDist)');
 
@@ -299,6 +337,7 @@ class ArtifactParser {
       'stats': <String, List<int>>{},
       'stats_percent': <String, List<int>>{},
       'glyphs': <String, List<int>>{},
+      'dop_stats': <String, List<int>>{},
       'set_bonus': null,
       'worn': null,
       'debug': <String>[],
@@ -307,6 +346,7 @@ class ArtifactParser {
     try {
       final stats = result['stats'] as Map<String, List<int>>;
       final percents = result['stats_percent'] as Map<String, List<int>>;
+      final dopStats = result['dop_stats'] as Map<String, List<int>>;
       final debug = result['debug'] as List<String>;
 
       final allText = mainBlocks.map((r) => _cleanText(r.text)).join(' | ');
@@ -357,7 +397,7 @@ class ArtifactParser {
         result['set'] = _cleanText(topBlock.text);
       }
 
-      _parseStats(mainBlocks, stats, percents, debug);
+      _parseStats(mainBlocks, stats, percents, dopStats, debug);
 
       if (result['level'] == null && iconBlocks.isNotEmpty) {
         for (final r in iconBlocks) {
