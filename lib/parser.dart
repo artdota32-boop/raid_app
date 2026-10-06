@@ -1,15 +1,17 @@
-import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 import 'dart:ui';
+import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 
-/// v3.3.1 — фикс: (N) не исключает, удаляется из текста; порядок replacements
+/// v3.3.8 — правила: регистронезависимые replacements, приоритет основного стата, игнор кнопок
 class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
   static const double xSplit = 130.0;
+  static const double yMaxForSet = 100.0;  // сет — только верх
+  static const double yMinForStats = 400.0; // статы — до этой Y
 
-  // ===== REPLACEMENTS (длинные ПЕРВЫМИ!) =====
+  // ===== REPLACEMENTS (длинные ПЕРВЫМИ) =====
   static const List<List<String>> replacementPairs = [
-    // СКР (длинные варианты первыми)
+    // СКР
     ['cYYlowb', 'Скр'],
     ['cYlowb', 'Скр'],
     ['cnmYlowb', 'Скр'],
@@ -22,6 +24,7 @@ class ArtifactParser {
     ['Скp', 'Скр'],
     ['Скв', 'Скр'],
     ['Ск(', 'Скр('],
+    ['Cwb', 'Скр'],
     ['cowb', 'Зщт'],
     // ЗДР
     ['3др', 'Здр'],
@@ -40,6 +43,7 @@ class ArtifactParser {
     ['Атк(1', 'Атк(1)'],
     ['Атк1', 'Атк'],
     ['АТк', 'Атк'],
+    ['Ат 1', 'Атк 1'],
     // КРИТ
     ['Крит. ш(1', 'Крит. ш(1)'],
     ['Крит. у(1', 'Крит. ур(1)'],
@@ -105,12 +109,12 @@ class ArtifactParser {
   }
 
   static double _centerY(OcrResult r) => (_minY(r) + _maxY(r)) / 2;
+  static double _centerX(OcrResult r) => (_minX(r) + _maxX(r)) / 2;
 
   /// Ищет название стата. (N) — НЕ мешает.
   static String? _findStatName(OcrResult r) {
     final text = _cleanText(r.text);
     if (text.isEmpty) return null;
-    // Убираем (N) — глиф
     final cleaned = _stripGlyphMarkers(text);
     if (cleaned.isEmpty) return null;
     for (final stat in statNames) {
@@ -119,13 +123,11 @@ class ArtifactParser {
     return null;
   }
 
-  /// Проверяет, есть ли в блоке % (или , в конце)
   static bool _hasPercent(OcrResult r) {
     final t = _cleanText(r.text);
     return t.contains('%') || t.endsWith(',');
   }
 
-  /// Извлекает число
   static int? _extractNumber(OcrResult r) {
     final text = _stripGlyphMarkers(_cleanText(r.text));
     if (text.isEmpty) return null;
@@ -156,7 +158,10 @@ class ArtifactParser {
 
     for (final r in mainBlocks) {
       if (r.points.isEmpty) continue;
-      final cx = (_minX(r) + _maxX(r)) / 2;
+      final cy = _centerY(r);
+      // Игнорируем блоки ниже Y=400 (кнопки, описание)
+      if (cy > yMinForStats) continue;
+      final cx = _centerX(r);
       final text = _cleanText(r.text);
 
       final statName = _findStatName(r);
@@ -244,12 +249,19 @@ class ArtifactParser {
         result['set_bonus'] = '${bonusMatch.group(1)} шт.';
       }
 
-      // Сет — первый блок, если не тип/редкость
-      if (mainBlocks.isNotEmpty) {
-        final first = _cleanText(mainBlocks.first.text);
-        if (first.isNotEmpty && !types.contains(first) && !rarities.contains(first)) {
-          result['set'] = first;
-        }
+      // v3.3.8: Сет — ТОЛЬКО блок с Y < 100 (верх карточки), не кнопки
+      for (final r in mainBlocks) {
+        if (r.points.isEmpty) continue;
+        final cy = _centerY(r);
+        if (cy > yMaxForSet) continue;
+        final text = _cleanText(r.text);
+        if (text.isEmpty) continue;
+        if (types.contains(text)) continue;
+        if (rarities.contains(text)) continue;
+        // Игнорируем кнопки
+        if (text.contains('Улучшить') || text.contains('Надеть')) continue;
+        result['set'] = text;
+        break;
       }
 
       _parseStats(mainBlocks, stats, percents);
