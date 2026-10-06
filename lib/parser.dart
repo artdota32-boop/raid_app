@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 
-/// v3.3.20 — 8 фиксов: Атк, (N), Скр RIGHT, cYlow, %, двойной пробел, DOP, двойное число
+/// v3.3.21 — новые replacements: Урит. шw, A (1, cnmaYlowb, caYlowbl
 class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
@@ -25,6 +25,8 @@ class ArtifactParser {
     ['cnmaYlowb', 'Скр'],
     ['cnmYlowb', 'Скр'],
     ['cmYlowb', 'Скр'],
+    ['cmnlowbl', 'Скр'],
+    ['cnmlowbl', 'Скр'],
     ['caYlowbl', 'Скр'],
     ['cYlow', 'Скр'],
     ['calowb', 'Скр'],
@@ -52,6 +54,11 @@ class ArtifactParser {
     ['Атк1', 'Атк'],
     ['АТк', 'Атк'],
     ['Ат 1', 'Атк 1'],
+    ['A (1', 'Атк(1)'],
+    ['A (', 'Атк('],
+    ['Урит. шw', 'Крит. ш'],
+    ['Урит. ш', 'Крит. ш'],
+    ['Урит. ш(1', 'Крит. ш(1)'],
     ['Крит. ш(1', 'Крит. ш(1)'],
     ['Крит. у(1', 'Крит. ур(1)'],
     ['Крит. (1w', 'Крит. ш(1)'],
@@ -90,7 +97,6 @@ class ArtifactParser {
     for (final pair in replacementPairs) {
       result = result.replaceAll(pair[0], pair[1]);
     }
-    // v3.3.20: Ат → Атк ТОЛЬКО отдельным словом (границы)
     result = result.replaceAll(RegExp(r'(?<![А-Яа-яЁё])Ат(?![А-Яа-яЁё])'), 'Атк');
     return result;
   }
@@ -168,7 +174,6 @@ class ArtifactParser {
     return null;
   }
 
-  /// Возвращает ВСЕ числа в блоке
   static List<int> _extractAllNumbers(OcrResult r) {
     String text = _cleanText(r.text);
     text = text.replaceAll(RegExp(r'\(\d+\)?'), ' ');
@@ -191,7 +196,6 @@ class ArtifactParser {
         final rest = cleaned.substring(stat.length).trim();
         final stripped = rest.replaceAll(RegExp(r'\(\d+\)?'), '').trim();
         if (RegExp(r'^\d+$').hasMatch(stripped)) {
-          // v3.3.20: не считать, если число ≤ 9 (это (N)-номер)
           final num = int.tryParse(stripped);
           if (num != null && num <= 9) return false;
           return true;
@@ -201,7 +205,6 @@ class ArtifactParser {
     return false;
   }
 
-  /// Проверка: блок содержит стат + ДВА числа (основной + доп)
   static bool _isStatWithTwoNumbers(String text) {
     final cleaned = _cleanText(text);
     for (final stat in statNames) {
@@ -235,7 +238,6 @@ class ArtifactParser {
 
       if (cy > yMinForStats) continue;
 
-      // v3.3.20: стат + ДВА числа в одном блоке
       if (_isStatWithTwoNumbers(r.text)) {
         final nums = _extractAllNumbers(r);
         final statName = _findStatName(r);
@@ -249,7 +251,6 @@ class ArtifactParser {
 
       final statName = _findStatName(r);
 
-      // v3.3.20: DOP-STAT в правой части (Метк16)
       if (statName != null && cx >= xSplit && _isStatWithNumber(r.text)) {
         final val = _extractNumber(r);
         if (val != null) {
