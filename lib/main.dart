@@ -3,7 +3,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:snapframes/snapframes.dart';
 import 'package:image/image.dart' as img;
 import 'package:paddle_ocr_native/paddle_ocr_native.dart' as pn;
-import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart' as v5;
 import 'parser.dart';
 import 'dart:io';
 import 'dart:typed_data';
@@ -119,18 +118,6 @@ class _HomePageState extends State<HomePage> {
     return file;
   }
 
-  /// Конвертация pn.OcrResult → v5.OcrResult (формат парсера)
-  v5.OcrResult _toV5Result(pn.OcrResult r) {
-    final points = r.points
-        .map((p) => Offset(p.x.toDouble(), p.y.toDouble()))
-        .toList();
-    return v5.OcrResult(
-      text: r.text,
-      confidence: r.confidence,
-      points: points,
-    );
-  }
-
   Future<void> _runOcr(Uint8List? cropped, Uint8List? rightPart, Uint8List? iconPart) async {
     if (cropped == null) return;
     try {
@@ -150,9 +137,9 @@ class _HomePageState extends State<HomePage> {
 
       await ocr.dispose();
 
-      final results = run.results.map((r) => _toV5Result(r)).toList();
-      final rightResults = rightRun?.results.map((r) => _toV5Result(r)).toList() ?? <v5.OcrResult>[];
-      final iconResults = iconRun?.results.map((r) => _toV5Result(r)).toList() ?? <v5.OcrResult>[];
+      final results = run.results;
+      final rightResults = rightRun?.results ?? <pn.OcrResult>[];
+      final iconResults = iconRun?.results ?? <pn.OcrResult>[];
 
       _dprint('########## OCR DEBUG START ##########');
       _dprint('--- MAIN blocks: ${results.length} ---');
@@ -194,13 +181,13 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _debugPrintBlock(String tag, int i, v5.OcrResult r) {
+  void _debugPrintBlock(String tag, int i, pn.OcrResult r) {
     if (r.points.isEmpty) {
       _dprint('=== $tag #$i | text="${r.text}" | POINTS EMPTY ===');
       return;
     }
-    final xs = r.points.map((p) => p.dx).toList();
-    final ys = r.points.map((p) => p.dy).toList();
+    final xs = r.points.map((p) => p.x.toDouble()).toList();
+    final ys = r.points.map((p) => p.y.toDouble()).toList();
     final minX = xs.reduce((a, b) => a < b ? a : b);
     final maxX = xs.reduce((a, b) => a > b ? a : b);
     final minY = ys.reduce((a, b) => a < b ? a : b);
