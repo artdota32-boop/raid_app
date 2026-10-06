@@ -1,7 +1,7 @@
-import 'dart:ui';
-import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
+import 'dart:ui' as ui;
+import 'package:paddle_ocr_native/paddle_ocr_native.dart' as pn;
 
-/// v3.3.21 — новые replacements: Урит. шw, A (1, cnmaYlowb, caYlowbl
+/// v3.4.0 — parser под paddle_ocr_native (PP-OCRv6)
 class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
@@ -73,15 +73,19 @@ class ArtifactParser {
 
   static const List<String> types = [
     'Доспех', 'Оружие', 'Шлем', 'Перчатки', 'Сапоги',
-    'Щит', 'Кольцо', 'Амулет', 'Знамя'
+    'Щит', 'Кольцо', 'Амулет', 'Знамя',
+    'Chestplate', 'Weapon', 'Helmet', 'Gloves', 'Boots',
+    'Shield', 'Ring', 'Amulet', 'Banner',
   ];
 
   static const List<String> rarities = [
-    'Легендарный', 'Эпический', 'Редкий', 'Обычный', 'Мифический'
+    'Легендарный', 'Эпический', 'Редкий', 'Обычный', 'Мифический',
+    'Legendary', 'Epic', 'Rare', 'Common', 'Mythical',
   ];
 
   static const List<String> statNames = [
-    'Метк', 'Крит. ш', 'Крит. ур', 'Атк', 'Здр', 'Скр', 'Зщт', 'Сопр'
+    'Метк', 'Крит. ш', 'Крит. ур', 'Атк', 'Здр', 'Скр', 'Зщт', 'Сопр',
+    'ACC', 'C.RATE', 'C.DMG', 'ATK', 'HP', 'SPD', 'DEF', 'RES',
   ];
 
   static String _latinToCyr(String text) {
@@ -109,30 +113,30 @@ class ArtifactParser {
     return text.replaceAll(RegExp(r'\(\d+\)?'), '').trim();
   }
 
-  static double _minX(OcrResult r) {
+  static double _minX(pn.OcrResult r) {
     if (r.points.isEmpty) return 0;
-    return r.points.map((p) => p.dx).reduce((a, b) => a < b ? a : b);
+    return r.points.map((p) => p.x.toDouble()).reduce((a, b) => a < b ? a : b);
   }
 
-  static double _maxX(OcrResult r) {
+  static double _maxX(pn.OcrResult r) {
     if (r.points.isEmpty) return 0;
-    return r.points.map((p) => p.dx).reduce((a, b) => a > b ? a : b);
+    return r.points.map((p) => p.x.toDouble()).reduce((a, b) => a > b ? a : b);
   }
 
-  static double _minY(OcrResult r) {
+  static double _minY(pn.OcrResult r) {
     if (r.points.isEmpty) return 0;
-    return r.points.map((p) => p.dy).reduce((a, b) => a < b ? a : b);
+    return r.points.map((p) => p.y.toDouble()).reduce((a, b) => a < b ? a : b);
   }
 
-  static double _maxY(OcrResult r) {
+  static double _maxY(pn.OcrResult r) {
     if (r.points.isEmpty) return 0;
-    return r.points.map((p) => p.dy).reduce((a, b) => a > b ? a : b);
+    return r.points.map((p) => p.y.toDouble()).reduce((a, b) => a > b ? a : b);
   }
 
-  static double _centerY(OcrResult r) => (_minY(r) + _maxY(r)) / 2;
-  static double _centerX(OcrResult r) => (_minX(r) + _maxX(r)) / 2;
+  static double _centerY(pn.OcrResult r) => (_minY(r) + _maxY(r)) / 2;
+  static double _centerX(pn.OcrResult r) => (_minX(r) + _maxX(r)) / 2;
 
-  static String? _findStatName(OcrResult r) {
+  static String? _findStatName(pn.OcrResult r) {
     final text = _cleanText(r.text);
     if (text.isEmpty) return null;
     final cleaned = _stripGlyphMarkers(text);
@@ -143,12 +147,12 @@ class ArtifactParser {
     return null;
   }
 
-  static bool _hasPercent(OcrResult r) {
+  static bool _hasPercent(pn.OcrResult r) {
     final t = _cleanText(r.text);
     return t.contains('%') || t.endsWith(',');
   }
 
-  static int? _extractNumber(OcrResult r) {
+  static int? _extractNumber(pn.OcrResult r) {
     String text = _cleanText(r.text);
     text = text.replaceAll(RegExp(r'\(\d+\)?'), ' ');
     text = text.replaceAll(RegExp(r'\d+\)'), ' ');
@@ -174,7 +178,7 @@ class ArtifactParser {
     return null;
   }
 
-  static List<int> _extractAllNumbers(OcrResult r) {
+  static List<int> _extractAllNumbers(pn.OcrResult r) {
     String text = _cleanText(r.text);
     text = text.replaceAll(RegExp(r'\(\d+\)?'), ' ');
     text = text.trim();
@@ -218,7 +222,7 @@ class ArtifactParser {
   }
 
   static void _parseStats(
-    List<OcrResult> mainBlocks,
+    List<pn.OcrResult> mainBlocks,
     Map<String, List<int>> statsOut,
     Map<String, List<int>> percentOut,
     Map<String, List<int>> dopStatsOut,
@@ -226,8 +230,8 @@ class ArtifactParser {
   ) {
     debugOut.add('[PARSER] _parseStats START, mainBlocks=${mainBlocks.length}');
 
-    final leftBlocks = <OcrResult>[];
-    final rightBlocks = <OcrResult>[];
+    final leftBlocks = <pn.OcrResult>[];
+    final rightBlocks = <pn.OcrResult>[];
 
     for (int idx = 0; idx < mainBlocks.length; idx++) {
       final r = mainBlocks[idx];
@@ -255,7 +259,7 @@ class ArtifactParser {
         final val = _extractNumber(r);
         if (val != null) {
           debugOut.add('[ITER] #$idx → DOP-STAT $statName = $val');
-          if (statName == 'Метк') {
+          if (statName == 'Метк' || statName == 'ACC') {
             dopStatsOut.putIfAbsent(statName, () => []).add(val);
           } else {
             statsOut.putIfAbsent(statName, () => []).add(val);
@@ -293,7 +297,7 @@ class ArtifactParser {
         continue;
       }
 
-      OcrResult? bestNum;
+      pn.OcrResult? bestNum;
       double bestDist = double.infinity;
       for (final right in rightBlocks) {
         final dy = (_centerY(right) - leftY).abs();
@@ -326,9 +330,9 @@ class ArtifactParser {
   }
 
   static Map<String, dynamic> parse(
-    List<OcrResult> mainBlocks, {
-    List<OcrResult> rightBlocks = const [],
-    List<OcrResult> iconBlocks = const [],
+    List<pn.OcrResult> mainBlocks, {
+    List<pn.OcrResult> rightBlocks = const [],
+    List<pn.OcrResult> iconBlocks = const [],
   }) {
     final result = <String, dynamic>{
       'set': null,
@@ -375,7 +379,7 @@ class ArtifactParser {
         result['set_bonus'] = '${bonusMatch.group(1)} шт.';
       }
 
-      OcrResult? topBlock;
+      pn.OcrResult? topBlock;
       double minY = double.infinity;
       for (final r in mainBlocks) {
         if (r.points.isEmpty) continue;
