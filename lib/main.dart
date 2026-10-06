@@ -53,22 +53,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _dprint(String line) {
-    print(line);
     debugPrint(line);
     _debugBuffer.add(line);
-    if (_debugBuffer.length > 200) _debugBuffer.removeAt(0);
-  }
-
-  Future<void> _writeDebugFile() async {
-    try {
-      final dir = await getExternalStorageDirectory();
-      if (dir == null) return;
-      final f = File('${dir.path}/raid_scanner_debug.txt');
-      await f.writeAsString(_debugBuffer.join('\n'));
-      _dprint('[DEBUG] Файл: ${f.path}');
-    } catch (e) {
-      _dprint('[DEBUG] Ошибка файла: $e');
-    }
+    if (_debugBuffer.length > 300) _debugBuffer.removeAt(0);
   }
 
   void _debugPrintBlock(String tag, int i, OcrResult r) {
@@ -147,13 +134,11 @@ class _HomePageState extends State<HomePage> {
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
-  // v3.3.7: без binarize, только x2 масштаб
   Uint8List? _cropBottomLeft(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
     final cropped = img.copyCrop(decoded,
         x: 70, y: 360, width: 480 - 70, height: 760 - 360);
-    // v3.3.7: только x2, без binarize/invert
     final resized = img.copyResize(cropped, width: cropped.width * 2);
     return Uint8List.fromList(img.encodeJpg(resized, quality: 95));
   }
@@ -179,10 +164,6 @@ class _HomePageState extends State<HomePage> {
       _dprint('########## OCR DEBUG START ##########');
       _dprint('--- MAIN blocks: ${sorted.length} ---');
       for (int i = 0; i < sorted.length; i++) _debugPrintBlock('MAIN', i, sorted[i]);
-      _dprint('--- RIGHT blocks: ${rightSorted.length} ---');
-      for (int i = 0; i < rightSorted.length; i++) _debugPrintBlock('RIGHT', i, rightSorted[i]);
-      _dprint('--- ICON blocks: ${iconResults.length} ---');
-      for (int i = 0; i < iconResults.length; i++) _debugPrintBlock('ICON', i, iconResults[i]);
       _dprint('########## OCR DEBUG END ##########');
 
       final parsed = ArtifactParser.parse(
@@ -190,6 +171,15 @@ class _HomePageState extends State<HomePage> {
         rightBlocks: rightSorted,
         iconBlocks: iconResults,
       );
+
+      _dprint('########## PARSER DEBUG START ##########');
+      final debugList = parsed['debug'] as List<String>?;
+      if (debugList != null) {
+        for (final d in debugList) {
+          _dprint(d);
+        }
+      }
+      _dprint('########## PARSER DEBUG END ##########');
 
       final text = sorted.map((r) => r.text).join("\n") +
           "\n" +
@@ -215,8 +205,6 @@ class _HomePageState extends State<HomePage> {
         _debugLog = _debugBuffer.join('\n');
         _status = 'OCR и парсинг завершены!';
       });
-
-      await _writeDebugFile();
     } catch (e) {
       setState(() => _status = 'Ошибка OCR: $e');
     }

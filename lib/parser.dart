@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 
-/// v3.3.13 — ОТЛАДКА: codeUnits для "Мет("
+/// v3.3.14 — DEBUG в result: codeUnits для "Мет"
 class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
@@ -104,23 +104,11 @@ class ArtifactParser {
 
   static String? _findStatName(OcrResult r) {
     final text = _cleanText(r.text);
-    if (r.text.contains('Мет')) {
-      print('[FINDSTAT] raw="${r.text}" clean="$text"');
-      print('[FINDSTAT] codeUnits: ${r.text.codeUnits}');
-    }
     if (text.isEmpty) return null;
     final cleaned = _stripGlyphMarkers(text);
     if (cleaned.isEmpty) return null;
     for (final stat in statNames) {
-      if (cleaned.contains(stat)) {
-        if (r.text.contains('Мет')) {
-          print('[FINDSTAT] MATCH: raw="${r.text}" → stat=$stat');
-        }
-        return stat;
-      }
-    }
-    if (r.text.contains('Мет')) {
-      print('[FINDSTAT] NO MATCH for raw="${r.text}" clean="$text" cleaned="$cleaned"');
+      if (cleaned.contains(stat)) return stat;
     }
     return null;
   }
@@ -154,38 +142,39 @@ class ArtifactParser {
     List<OcrResult> mainBlocks,
     Map<String, List<int>> statsOut,
     Map<String, List<int>> percentOut,
+    List<String> debugOut,
   ) {
-    print('[PARSER] _parseStats START, mainBlocks=${mainBlocks.length}');
+    debugOut.add('[PARSER] _parseStats START, mainBlocks=${mainBlocks.length}');
 
     final leftBlocks = <OcrResult>[];
     final rightBlocks = <OcrResult>[];
 
     for (int idx = 0; idx < mainBlocks.length; idx++) {
       final r = mainBlocks[idx];
-      final ptsLen = r.points.length;
-      final cyVal = ptsLen > 0 ? _centerY(r) : -1.0;
-      final cxVal = ptsLen > 0 ? _centerX(r) : -1.0;
-      print('[PARSER-ITER] #$idx raw="${r.text}" points=$ptsLen cx=$cxVal cy=$cyVal');
-
       if (r.points.isEmpty) continue;
       final cy = _centerY(r);
       if (cy > yMinForStats) continue;
       final cx = _centerX(r);
       final text = _cleanText(r.text);
 
+      if (r.text.contains('Мет')) {
+        debugOut.add('[FINDSTAT] raw="${r.text}" clean="$text" codeUnits=${r.text.codeUnits}');
+      }
+
       final statName = _findStatName(r);
       if (statName != null && cx < xSplit) {
         leftBlocks.add(r);
-        print('[PARSER] LEFT: raw="${r.text}" clean="$text" stat=$statName cx=$cx cy=$cy');
+        if (r.text.contains('Мет')) {
+          debugOut.add('[FINDSTAT] MATCH: raw="${r.text}" → stat=$statName');
+        }
         continue;
       }
       if (cx >= xSplit && RegExp(r'\d').hasMatch(text)) {
         rightBlocks.add(r);
-        print('[PARSER] RIGHT: raw="${r.text}" clean="$text" cx=$cx cy=$cy');
       }
     }
 
-    print('[PARSER] leftBlocks=${leftBlocks.length} rightBlocks=${rightBlocks.length}');
+    debugOut.add('[PARSER] leftBlocks=${leftBlocks.length} rightBlocks=${rightBlocks.length}');
 
     for (final left in leftBlocks) {
       final statName = _findStatName(left);
@@ -203,17 +192,14 @@ class ArtifactParser {
       }
 
       if (bestNum == null) {
-        print('[PARSER] NO MATCH for $statName at cy=$leftY');
+        debugOut.add('[PARSER] NO MATCH for $statName at cy=$leftY');
         continue;
       }
 
       final value = _extractNumber(bestNum);
-      if (value == null) {
-        print('[PARSER] NO VALUE for $statName (bestNum="${bestNum.text}")');
-        continue;
-      }
+      if (value == null) continue;
 
-      print('[PARSER] MATCH: $statName = $value (from "${bestNum.text}" dy=$bestDist)');
+      debugOut.add('[PARSER] MATCH: $statName = $value (from "${bestNum.text}" dy=$bestDist)');
 
       if (_hasPercent(bestNum)) {
         final list = percentOut.putIfAbsent(statName, () => []);
@@ -224,7 +210,7 @@ class ArtifactParser {
       }
     }
 
-    print('[PARSER] _parseStats END');
+    debugOut.add('[PARSER] _parseStats END');
   }
 
   static Map<String, dynamic> parse(
@@ -242,11 +228,13 @@ class ArtifactParser {
       'glyphs': <String, List<int>>{},
       'set_bonus': null,
       'worn': null,
+      'debug': <String>[],
     };
 
     try {
       final stats = result['stats'] as Map<String, List<int>>;
       final percents = result['stats_percent'] as Map<String, List<int>>;
+      final debug = result['debug'] as List<String>;
 
       final allText = mainBlocks.map((r) => _cleanText(r.text)).join(' | ');
 
@@ -293,7 +281,7 @@ class ArtifactParser {
         result['set'] = _cleanText(topBlock.text);
       }
 
-      _parseStats(mainBlocks, stats, percents);
+      _parseStats(mainBlocks, stats, percents, debug);
 
       if (result['level'] == null && iconBlocks.isNotEmpty) {
         for (final r in iconBlocks) {
