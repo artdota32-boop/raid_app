@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:snapframes/snapframes.dart';
 import 'package:image/image.dart' as img;
-import 'package:paddle_ocr_native/paddle_ocr_native.dart' as paddle_native;
+import 'package:paddle_ocr_native/paddle_ocr_native.dart' as pn;
+import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart' as v5;
 import 'parser.dart';
 import 'dart:io';
 import 'dart:typed_data';
@@ -112,19 +113,31 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<File> _saveBytesToFile(Uint8List bytes, String name) async {
-    final tempDir = await getTemporaryDirectory();
-    final file = File('${tempDir.path}/$name');
+    final dir = Directory.systemTemp;
+    final file = File('${dir.path}/$name');
     await file.writeAsBytes(bytes);
     return file;
+  }
+
+  /// Конвертация pn.OcrResult → v5.OcrResult (формат парсера)
+  v5.OcrResult _toV5Result(pn.OcrResult r) {
+    final points = r.points
+        .map((p) => Offset(p.x.toDouble(), p.y.toDouble()))
+        .toList();
+    return v5.OcrResult(
+      text: r.text,
+      confidence: r.confidence,
+      points: points,
+    );
   }
 
   Future<void> _runOcr(Uint8List? cropped, Uint8List? rightPart, Uint8List? iconPart) async {
     if (cropped == null) return;
     try {
-      final ocr = paddle_native.PaddleOcr();
+      final ocr = pn.PaddleOcr();
       await ocr.init(
-        config: const paddle_native.PaddleOcrConfig(),
-        engine: const paddle_native.EngineConfig(numThreads: 4),
+        config: const pn.PaddleOcrConfig(),
+        engine: const pn.EngineConfig(numThreads: 4),
       );
 
       final croppedFile = await _saveBytesToFile(cropped, 'main_crop.jpg');
@@ -137,10 +150,9 @@ class _HomePageState extends State<HomePage> {
 
       await ocr.dispose();
 
-      // Конвертируем результаты в OcrResult (формат парсера)
-      final results = run.results.map((r) => _toOcrResult(r)).toList();
-      final rightResults = rightRun?.results.map((r) => _toOcrResult(r)).toList() ?? [];
-      final iconResults = iconRun?.results.map((r) => _toOcrResult(r)).toList() ?? [];
+      final results = run.results.map((r) => _toV5Result(r)).toList();
+      final rightResults = rightRun?.results.map((r) => _toV5Result(r)).toList() ?? <v5.OcrResult>[];
+      final iconResults = iconRun?.results.map((r) => _toV5Result(r)).toList() ?? <v5.OcrResult>[];
 
       _dprint('########## OCR DEBUG START ##########');
       _dprint('--- MAIN blocks: ${results.length} ---');
@@ -167,6 +179,8 @@ class _HomePageState extends State<HomePage> {
 Проценты: ${parsed['stats_percent'] ?? {}}
 Доп-статы: ${parsed['dop_stats'] ?? {}}
 Глифы: ${parsed['glyphs']}
+Бонус сета: ${parsed['set_bonus'] ?? '?'}
+Надето: ${parsed['worn'] ?? '?'}
 ''';
 
       setState(() {
@@ -180,12 +194,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  paddle_native.OcrResult _toOcrResult(paddle_native.OcrResult r) {
-    final points = r.points.map((p) => Offset(p.x.toDouble(), p.y.toDouble())).toList();
-    return OcrResult(text: r.text, confidence: r.confidence, points: points);
-  }
-
-  void _debugPrintBlock(String tag, int i, OcrResult r) {
+  void _debugPrintBlock(String tag, int i, v5.OcrResult r) {
     if (r.points.isEmpty) {
       _dprint('=== $tag #$i | text="${r.text}" | POINTS EMPTY ===');
       return;
