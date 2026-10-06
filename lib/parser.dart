@@ -97,7 +97,7 @@ class ArtifactParser {
   }
 
   static String _applyReplacements(String text) {
-    String result = _latinToCyr(text);
+    String result = text;
     for (final pair in replacementPairs) {
       result = result.replaceAll(pair[0], pair[1]);
     }
