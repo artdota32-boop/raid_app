@@ -1,37 +1,29 @@
 import 'dart:ui';
 import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 
-/// v3.3.16 — фикс: латинские M/e/E в кириллицу + codeUnits debug
+/// v3.3.17 — 5 фиксов: сет, Ат->Атк, Атк+число, Здр%, Крит.ш 10%
 class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
   static const double xSplit = 130.0;
   static const double yMaxForSet = 200.0;
   static const double yMinForStats = 400.0;
+  static const double xMaxForSet = 400.0;  // сет не правее этого
 
-  // Латинские → кириллические (OCR часто путает)
   static const Map<String, String> latinToCyrillic = {
-    'M': 'М',  // U+004D → U+041C
-    'e': 'е',  // U+0065 → U+0435
-    'E': 'Е',  // U+0045 → U+0415
-    'T': 'Т',  // U+0054 → U+0422
-    'y': 'у',  // U+0079 → U+0443
-    'x': 'х',  // U+0078 → U+0445
-    'c': 'с',  // U+0063 → U+0441
-    'p': 'р',  // U+0070 → U+0440
-    'A': 'А',  // U+0041 → U+0410
-    'B': 'В',  // U+0042 → U+0412
-    'H': 'Н',  // U+0048 → U+041D
-    'K': 'К',  // U+004B → U+041A
-    'O': 'О',  // U+004F → U+041E
-    'P': 'Р',  // U+0050 → U+0420
-    'C': 'С',  // U+0043 → U+0421
+    'M': 'М', 'e': 'е', 'E': 'Е', 'T': 'Т',
+    'y': 'у', 'x': 'х', 'c': 'с', 'p': 'р',
+    'A': 'А', 'B': 'В', 'H': 'Н', 'K': 'К',
+    'O': 'О', 'P': 'Р', 'C': 'С', 'k': 'к',
+    'o': 'о', 'a': 'а', 't': 'т', 'r': 'р',
+    'n': 'п', 'u': 'и',
   };
 
   static const List<List<String>> replacementPairs = [
     ['cYYlowb', 'Скр'],
     ['cYlowb', 'Скр'],
     ['cnmYlowb', 'Скр'],
+    ['cmYlowb', 'Скр'],
     ['calowb', 'Скр'],
     ['cYlwb', 'Скр'],
     ['cYlob', 'Зщт'],
@@ -57,8 +49,10 @@ class ArtifactParser {
     ['Атк1', 'Атк'],
     ['АТк', 'Атк'],
     ['Ат 1', 'Атк 1'],
+    ['Ат', 'Атк'],
     ['Крит. ш(1', 'Крит. ш(1)'],
     ['Крит. у(1', 'Крит. ур(1)'],
+    ['Крит. (1w', 'Крит. ш(1)'],
     ['Крит. (1', 'Крит. ш(1)'],
     ['Крит. (', 'Крит. ш('],
     ['сКрит', 'Крит'],
@@ -81,7 +75,6 @@ class ArtifactParser {
     'Метк', 'Крит. ш', 'Крит. ур', 'Атк', 'Здр', 'Скр', 'Зщт', 'Сопр'
   ];
 
-  /// Заменяет латинские буквы на кириллические (OCR часто путает)
   static String _latinToCyr(String text) {
     String result = text;
     latinToCyrillic.forEach((lat, cyr) {
@@ -95,7 +88,6 @@ class ArtifactParser {
     for (final pair in replacementPairs) {
       result = result.replaceAll(pair[0], pair[1]);
     }
-    result = result.replaceAll(RegExp(r'\bАт\b'), 'Атк');
     return result;
   }
 
@@ -166,14 +158,24 @@ class ArtifactParser {
     return null;
   }
 
+  /// Разделяет блок "стат + число" на стат + число
+  static bool _isStatWithNumber(String text) {
+    final cleaned = _cleanText(text);
+    for (final stat in statNames) {
+      if (cleaned.startsWith(stat)) {
+        final rest = cleaned.substring(stat.length).trim();
+        if (RegExp(r'^\d+$').hasMatch(rest)) return true;
+      }
+    }
+    return false;
+  }
+
   static void _parseStats(
     List<OcrResult> mainBlocks,
     Map<String, List<int>> statsOut,
     Map<String, List<int>> percentOut,
     List<String> debugOut,
   ) {
-    debugOut.add('[PARSER] _parseStats START, mainBlocks=${mainBlocks.length}');
-
     final leftBlocks = <OcrResult>[];
     final rightBlocks = <OcrResult>[];
 
@@ -186,12 +188,16 @@ class ArtifactParser {
 
       if (cy > yMinForStats) continue;
 
+      // v3.3.17: стат + число в одном блоке ("Атк 170") → left
+      if (_isStatWithNumber(r.text)) {
+        leftBlocks.add(r);
+        debugOut.add('[ITER] #$idx → LEFT (stat+num) raw="${r.text}"');
+        continue;
+      }
+
       final statName = _findStatName(r);
       if (statName != null && cx < xSplit) {
         leftBlocks.add(r);
-        if (idx == 9) {
-          debugOut.add('[ITER] #9 → LEFT stat=$statName (raw="${r.text}" clean="$text")');
-        }
         continue;
       }
       if (cx >= xSplit && RegExp(r'\d').hasMatch(text)) {
@@ -205,6 +211,15 @@ class ArtifactParser {
       final statName = _findStatName(left);
       if (statName == null) continue;
       final leftY = _centerY(left);
+
+      // Сначала: сам блок может содержать значение (Атк 170)
+      final selfValue = _extractNumber(left);
+      if (_isStatWithNumber(left.text) && selfValue != null) {
+        debugOut.add('[PARSER] MATCH (self): $statName = $selfValue');
+        final list = statsOut.putIfAbsent(statName, () => []);
+        if (!list.contains(selfValue)) list.add(selfValue);
+        continue;
+      }
 
       OcrResult? bestNum;
       double bestDist = double.infinity;
@@ -231,8 +246,6 @@ class ArtifactParser {
         if (!list.contains(value)) list.add(value);
       }
     }
-
-    debugOut.add('[PARSER] _parseStats END');
   }
 
   static Map<String, dynamic> parse(
@@ -283,13 +296,17 @@ class ArtifactParser {
         result['set_bonus'] = '${bonusMatch.group(1)} шт.';
       }
 
+      // v3.3.17: сет — только с cx < 400, длина > 5, не UI
       OcrResult? topBlock;
       double minY = double.infinity;
       for (final r in mainBlocks) {
         if (r.points.isEmpty) continue;
         final cy = _centerY(r);
+        final cx = _centerX(r);
         if (cy > yMaxForSet) continue;
+        if (cx > xMaxForSet) continue;  // ← фикс: сет не справа
         final text = _cleanText(r.text);
+        if (text.length < 5) continue;   // ← фикс: не мусор
         if (text.isEmpty) continue;
         if (types.contains(text)) continue;
         if (rarities.contains(text)) continue;
