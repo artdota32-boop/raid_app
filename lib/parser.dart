@@ -1,13 +1,32 @@
 import 'dart:ui';
 import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 
-/// v3.3.15 — DEBUG: codeUnits для ВСЕХ блоков в цикле
+/// v3.3.16 — фикс: латинские M/e/E в кириллицу + codeUnits debug
 class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
   static const double xSplit = 130.0;
   static const double yMaxForSet = 200.0;
   static const double yMinForStats = 400.0;
+
+  // Латинские → кириллические (OCR часто путает)
+  static const Map<String, String> latinToCyrillic = {
+    'M': 'М',  // U+004D → U+041C
+    'e': 'е',  // U+0065 → U+0435
+    'E': 'Е',  // U+0045 → U+0415
+    'T': 'Т',  // U+0054 → U+0422
+    'y': 'у',  // U+0079 → U+0443
+    'x': 'х',  // U+0078 → U+0445
+    'c': 'с',  // U+0063 → U+0441
+    'p': 'р',  // U+0070 → U+0440
+    'A': 'А',  // U+0041 → U+0410
+    'B': 'В',  // U+0042 → U+0412
+    'H': 'Н',  // U+0048 → U+041D
+    'K': 'К',  // U+004B → U+041A
+    'O': 'О',  // U+004F → U+041E
+    'P': 'Р',  // U+0050 → U+0420
+    'C': 'С',  // U+0043 → U+0421
+  };
 
   static const List<List<String>> replacementPairs = [
     ['cYYlowb', 'Скр'],
@@ -62,8 +81,17 @@ class ArtifactParser {
     'Метк', 'Крит. ш', 'Крит. ур', 'Атк', 'Здр', 'Скр', 'Зщт', 'Сопр'
   ];
 
-  static String _applyReplacements(String text) {
+  /// Заменяет латинские буквы на кириллические (OCR часто путает)
+  static String _latinToCyr(String text) {
     String result = text;
+    latinToCyrillic.forEach((lat, cyr) {
+      result = result.replaceAll(lat, cyr);
+    });
+    return result;
+  }
+
+  static String _applyReplacements(String text) {
+    String result = _latinToCyr(text);
     for (final pair in replacementPairs) {
       result = result.replaceAll(pair[0], pair[1]);
     }
@@ -151,32 +179,23 @@ class ArtifactParser {
 
     for (int idx = 0; idx < mainBlocks.length; idx++) {
       final r = mainBlocks[idx];
-      if (r.points.isEmpty) {
-        debugOut.add('[ITER] #$idx EMPTY POINTS raw="${r.text}"');
-        continue;
-      }
+      if (r.points.isEmpty) continue;
       final cy = _centerY(r);
       final cx = _centerX(r);
       final text = _cleanText(r.text);
 
-      debugOut.add('[ITER] #$idx raw="${r.text}" clean="$text" cu=${r.text.codeUnits} cx=$cx cy=$cy');
-
-      if (cy > yMinForStats) {
-        debugOut.add('[ITER] #$idx SKIP (cy>$yMinForStats)');
-        continue;
-      }
+      if (cy > yMinForStats) continue;
 
       final statName = _findStatName(r);
       if (statName != null && cx < xSplit) {
         leftBlocks.add(r);
-        debugOut.add('[ITER] #$idx → LEFT stat=$statName');
+        if (idx == 9) {
+          debugOut.add('[ITER] #9 → LEFT stat=$statName (raw="${r.text}" clean="$text")');
+        }
         continue;
       }
       if (cx >= xSplit && RegExp(r'\d').hasMatch(text)) {
         rightBlocks.add(r);
-        debugOut.add('[ITER] #$idx → RIGHT');
-      } else {
-        debugOut.add('[ITER] #$idx → NEITHER (cx=$cx, text="$text")');
       }
     }
 
@@ -197,10 +216,7 @@ class ArtifactParser {
         }
       }
 
-      if (bestNum == null) {
-        debugOut.add('[PARSER] NO MATCH for $statName at cy=$leftY');
-        continue;
-      }
+      if (bestNum == null) continue;
 
       final value = _extractNumber(bestNum);
       if (value == null) continue;
