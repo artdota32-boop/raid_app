@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 
-/// v3.3.12 — ОТЛАДКА: print для каждого блока в цикле _parseStats
+/// v3.3.13 — ОТЛАДКА: codeUnits для "Мет("
 class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
@@ -104,11 +104,23 @@ class ArtifactParser {
 
   static String? _findStatName(OcrResult r) {
     final text = _cleanText(r.text);
+    if (r.text.contains('Мет')) {
+      print('[FINDSTAT] raw="${r.text}" clean="$text"');
+      print('[FINDSTAT] codeUnits: ${r.text.codeUnits}');
+    }
     if (text.isEmpty) return null;
     final cleaned = _stripGlyphMarkers(text);
     if (cleaned.isEmpty) return null;
     for (final stat in statNames) {
-      if (cleaned.contains(stat)) return stat;
+      if (cleaned.contains(stat)) {
+        if (r.text.contains('Мет')) {
+          print('[FINDSTAT] MATCH: raw="${r.text}" → stat=$stat');
+        }
+        return stat;
+      }
+    }
+    if (r.text.contains('Мет')) {
+      print('[FINDSTAT] NO MATCH for raw="${r.text}" clean="$text" cleaned="$cleaned"');
     }
     return null;
   }
