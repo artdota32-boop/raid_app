@@ -85,7 +85,9 @@ class ArtifactParser {
 
   static const List<String> statNames = [
     'Метк', 'Крит. ш', 'Крит. ур', 'Атк', 'Здр', 'Скр', 'Зщт', 'Сопр',
-    'ACC', 'C.RATE', 'C.DMG', 'ATK', 'HP', 'SPD', 'DEF', 'RES',
+    'ACC', 'C.RATE', 'C.RAT', 'C. RATE', 'C. RAT', 'C RATE', 'CRATE',
+    'C.DMG', 'C. DMG', 'C DMG', 'CDMG',
+    'ATK', 'HP', 'SPD', 'DEF', 'RES',
   ];
 
   static String _latinToCyr(String text) {
@@ -141,8 +143,14 @@ class ArtifactParser {
     if (text.isEmpty) return null;
     final cleaned = _stripGlyphMarkers(text);
     if (cleaned.isEmpty) return null;
+
+    String norm(String s) =>
+        s.replaceAll(RegExp(r'[\s\.]'), '').toUpperCase();
+
+    final normalized = norm(cleaned);
+
     for (final stat in statNames) {
-      if (cleaned.contains(stat)) return stat;
+      if (normalized.contains(norm(stat))) return stat;
     }
     return null;
   }
@@ -254,6 +262,17 @@ class ArtifactParser {
       }
 
       final statName = _findStatName(r);
+
+      // === ПРОВЕРКА: главный стат (DEF 143, ATK 143) — верхняя зона справа ===
+      final isMainStatZone = cy < 220.0 && cx > 180.0;
+      if (isMainStatZone && statName != null && _isStatWithNumber(r.text)) {
+        final val = _extractNumber(r);
+        if (val != null) {
+          debugOut.add('[ITER] #$idx → MAIN-STAT $statName = $val');
+          statsOut.putIfAbsent(statName, () => []).add(val);
+          continue;
+        }
+      }
 
       if (statName != null && cx >= xSplit && _isStatWithNumber(r.text)) {
         final val = _extractNumber(r);
@@ -372,11 +391,21 @@ class ArtifactParser {
       }
 
       final wornMatch = RegExp(r'Надето[:\s]*(\d+/\d+)').firstMatch(allText);
-      if (wornMatch != null) result['worn'] = wornMatch.group(1);
+      if (wornMatch != null) {
+        result['worn'] = wornMatch.group(1);
+      } else {
+        final wornEn = RegExp(r'(\d+/\d+)\s*Artifacts Equipped').firstMatch(allText);
+        if (wornEn != null) result['worn'] = wornEn.group(1);
+      }
 
-      final bonusMatch = RegExp(r'Комплект[:\s]*(\d+)\s*шт').firstMatch(allText);
-      if (bonusMatch != null) {
-        result['set_bonus'] = '${bonusMatch.group(1)} шт.';
+      final bonusRu = RegExp(r'Комплект[:\s]*(\d+)\s*шт').firstMatch(allText);
+      if (bonusRu != null) {
+        result['set_bonus'] = '${bonusRu.group(1)} шт.';
+      } else {
+        final bonusEn = RegExp(r'New Bonus for every (\w+)').firstMatch(allText);
+        if (bonusEn != null) {
+          result['set_bonus'] = bonusEn.group(1);
+        }
       }
 
       pn.OcrResult? topBlock;
@@ -399,7 +428,11 @@ class ArtifactParser {
         }
       }
       if (topBlock != null) {
-        result['set'] = _cleanText(topBlock.text);
+        String setName = _cleanText(topBlock.text);
+        setName = setName.replaceFirst(
+          RegExp(r'^\s*(Set|Сет)\s*[:\.]?\s*', caseSensitive: false), '');
+        setName = setName.trim();
+        result['set'] = setName.isEmpty ? null : setName;
       }
 
       _parseStats(mainBlocks, stats, percents, dopStats, debug);
