@@ -150,13 +150,17 @@ class _HomePageState extends State<HomePage> {
       final recPath = await _copyAssetToFile('assets/models/rec.onnx', 'rec.onnx');
       final dictPath = await _copyAssetToFile('assets/models/dict.txt', 'dict.txt');
 
+      // v3.3.23: параметры для PP-OCRv6
       final ocr = await PaddleOcr.create(
         source: ModelSource.filePaths(det: detPath, rec: recPath, dict: dictPath),
+        detDbThresh: 0.2,
+        detDbBoxThresh: 0.4,
+        detDbUnclipRatio: 1.4,
       );
 
-      final results = await ocr.recognize(cropped);
-      final rightResults = rightPart != null ? await ocr.recognize(rightPart) : <OcrResult>[];
-      final iconResults = iconPart != null ? await ocr.recognize(iconPart) : <OcrResult>[];
+      final results = await ocr.recognize(cropped, maxSideLen: 960);
+      final rightResults = rightPart != null ? await ocr.recognize(rightPart, maxSideLen: 960) : <OcrResult>[];
+      final iconResults = iconPart != null ? await ocr.recognize(iconPart, maxSideLen: 960) : <OcrResult>[];
 
       final sorted = List<OcrResult>.from(results);
       final rightSorted = List<OcrResult>.from(rightResults);
@@ -194,6 +198,7 @@ class _HomePageState extends State<HomePage> {
 Уровень: ${parsed['level'] ?? '?'}
 Статы: ${parsed['stats']}
 Проценты: ${parsed['stats_percent'] ?? {}}
+Доп-статы: ${parsed['dop_stats'] ?? {}}
 Глифы: ${parsed['glyphs']}
 Бонус сета: ${parsed['set_bonus'] ?? '?'}
 Надето: ${parsed['worn'] ?? '?'}
