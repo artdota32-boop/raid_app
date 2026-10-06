@@ -1,14 +1,14 @@
 import 'dart:ui';
 import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
 
-/// v3.3.17 — 5 фиксов: сет, Ат->Атк, Атк+число, Здр%, Крит.ш 10%
+/// v3.3.18 — фиксы: (N) в числе, дубли Здр, доп. проверки
 class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
   static const double xSplit = 130.0;
   static const double yMaxForSet = 200.0;
   static const double yMinForStats = 400.0;
-  static const double xMaxForSet = 400.0;  // сет не правее этого
+  static const double xMaxForSet = 400.0;
 
   static const Map<String, String> latinToCyrillic = {
     'M': 'М', 'e': 'е', 'E': 'Е', 'T': 'Т',
@@ -95,7 +95,14 @@ class ArtifactParser {
     return _applyReplacements(text).trim();
   }
 
+  /// Удаляет (N) полностью (и цифру и скобки)
   static String _stripGlyphMarkers(String text) {
+    return text.replaceAll(RegExp(r'\(\d+\)?'), '').trim();
+  }
+
+  /// Удаляет "(число" в конце и "(число)" (только скобки с цифрами)
+  static String _stripNumberInParens(String text) {
+    // "Сопр(2)" → "Сопр", "Сопр(2) 28" → "Сопр 28"
     return text.replaceAll(RegExp(r'\(\d+\)?'), '').trim();
   }
 
@@ -138,11 +145,17 @@ class ArtifactParser {
     return t.contains('%') || t.endsWith(',');
   }
 
+  /// Извлекает число. Игнорирует числа в скобках (N) типа "Сопр(2)"
   static int? _extractNumber(OcrResult r) {
-    final text = _stripGlyphMarkers(_cleanText(r.text));
+    String text = _cleanText(r.text);
+    // v3.3.18: убираем "(число)" ПОЛНОСТЬЮ (скобки + цифра)
+    text = text.replaceAll(RegExp(r'\(\d+\)?'), ' ');
+    text = text.trim();
     if (text.isEmpty) return null;
+
     final matches = RegExp(r'\d+').allMatches(text).toList();
     if (matches.isEmpty) return null;
+
     int? best;
     for (final m in matches) {
       final val = int.tryParse(m.group(0) ?? '');
@@ -158,13 +171,13 @@ class ArtifactParser {
     return null;
   }
 
-  /// Разделяет блок "стат + число" на стат + число
   static bool _isStatWithNumber(String text) {
     final cleaned = _cleanText(text);
     for (final stat in statNames) {
       if (cleaned.startsWith(stat)) {
         final rest = cleaned.substring(stat.length).trim();
-        if (RegExp(r'^\d+$').hasMatch(rest)) return true;
+        final stripped = rest.replaceAll(RegExp(r'\(\d+\)?'), '').trim();
+        if (RegExp(r'^\d+$').hasMatch(stripped)) return true;
       }
     }
     return false;
@@ -188,10 +201,8 @@ class ArtifactParser {
 
       if (cy > yMinForStats) continue;
 
-      // v3.3.17: стат + число в одном блоке ("Атк 170") → left
       if (_isStatWithNumber(r.text)) {
         leftBlocks.add(r);
-        debugOut.add('[ITER] #$idx → LEFT (stat+num) raw="${r.text}"');
         continue;
       }
 
@@ -212,7 +223,6 @@ class ArtifactParser {
       if (statName == null) continue;
       final leftY = _centerY(left);
 
-      // Сначала: сам блок может содержать значение (Атк 170)
       final selfValue = _extractNumber(left);
       if (_isStatWithNumber(left.text) && selfValue != null) {
         debugOut.add('[PARSER] MATCH (self): $statName = $selfValue');
@@ -296,7 +306,6 @@ class ArtifactParser {
         result['set_bonus'] = '${bonusMatch.group(1)} шт.';
       }
 
-      // v3.3.17: сет — только с cx < 400, длина > 5, не UI
       OcrResult? topBlock;
       double minY = double.infinity;
       for (final r in mainBlocks) {
@@ -304,9 +313,9 @@ class ArtifactParser {
         final cy = _centerY(r);
         final cx = _centerX(r);
         if (cy > yMaxForSet) continue;
-        if (cx > xMaxForSet) continue;  // ← фикс: сет не справа
+        if (cx > xMaxForSet) continue;
         final text = _cleanText(r.text);
-        if (text.length < 5) continue;   // ← фикс: не мусор
+        if (text.length < 5) continue;
         if (text.isEmpty) continue;
         if (types.contains(text)) continue;
         if (rarities.contains(text)) continue;
