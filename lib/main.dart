@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:snapframes/snapframes.dart';
 import 'package:image/image.dart' as img;
-import 'package:flutter_paddle_ocr_v5/flutter_paddle_ocr_v5.dart';
+import 'package:paddle_ocr_native/paddle_ocr_native.dart' as paddle_native;
 import 'parser.dart';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
 
 void main() {
@@ -15,7 +14,6 @@ void main() {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -28,7 +26,6 @@ class MyApp extends StatelessWidget {
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
-
   @override
   State<HomePage> createState() => _HomePageState();
 }
@@ -42,36 +39,10 @@ class _HomePageState extends State<HomePage> {
   String _debugLog = '';
   final List<String> _debugBuffer = [];
 
-  Future<String> _copyAssetToFile(String assetPath, String fileName) async {
-    final tempDir = await getTemporaryDirectory();
-    final file = File('${tempDir.path}/$fileName');
-    if (!await file.exists()) {
-      final data = await rootBundle.load(assetPath);
-      await file.writeAsBytes(data.buffer.asUint8List());
-    }
-    return file.path;
-  }
-
   void _dprint(String line) {
     debugPrint(line);
     _debugBuffer.add(line);
     if (_debugBuffer.length > 300) _debugBuffer.removeAt(0);
-  }
-
-  void _debugPrintBlock(String tag, int i, OcrResult r) {
-    if (r.points.isEmpty) {
-      _dprint('=== $tag #$i | text="${r.text}" | POINTS EMPTY ===');
-      return;
-    }
-    final xs = r.points.map((p) => p.dx).toList();
-    final ys = r.points.map((p) => p.dy).toList();
-    final minX = xs.reduce((a, b) => a < b ? a : b);
-    final maxX = xs.reduce((a, b) => a > b ? a : b);
-    final minY = ys.reduce((a, b) => a < b ? a : b);
-    final maxY = ys.reduce((a, b) => a > b ? a : b);
-    final cx = (minX + maxX) / 2;
-    final cy = (minY + maxY) / 2;
-    _dprint('=== $tag #$i | text="${r.text}" | conf=${r.confidence.toStringAsFixed(2)} | x[${minX.toStringAsFixed(0)}..${maxX.toStringAsFixed(0)}] y[${minY.toStringAsFixed(0)}..${maxY.toStringAsFixed(0)}] | center=(${cx.toStringAsFixed(0)},${cy.toStringAsFixed(0)}) ===');
   }
 
   Future<void> _pickVideo() async {
@@ -121,75 +92,71 @@ class _HomePageState extends State<HomePage> {
   Uint8List? _cropIcon(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
-    final cropped = img.copyCrop(decoded,
-        x: 113, y: 490, width: 214 - 113, height: 540 - 490);
+    final cropped = img.copyCrop(decoded, x: 113, y: 490, width: 214 - 113, height: 540 - 490);
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
   Uint8List? _cropRightPart(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
-    final cropped = img.copyCrop(decoded,
-        x: 252, y: 445, width: 380 - 252, height: 488 - 445);
+    final cropped = img.copyCrop(decoded, x: 252, y: 445, width: 380 - 252, height: 488 - 445);
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
   Uint8List? _cropBottomLeft(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
-    final cropped = img.copyCrop(decoded,
-        x: 70, y: 360, width: 480 - 70, height: 760 - 360);
+    final cropped = img.copyCrop(decoded, x: 70, y: 360, width: 480 - 70, height: 760 - 360);
     final resized = img.copyResize(cropped, width: cropped.width * 2);
     return Uint8List.fromList(img.encodeJpg(resized, quality: 95));
+  }
+
+  Future<File> _saveBytesToFile(Uint8List bytes, String name) async {
+    final tempDir = await getTemporaryDirectory();
+    final file = File('${tempDir.path}/$name');
+    await file.writeAsBytes(bytes);
+    return file;
   }
 
   Future<void> _runOcr(Uint8List? cropped, Uint8List? rightPart, Uint8List? iconPart) async {
     if (cropped == null) return;
     try {
-      final detPath = await _copyAssetToFile('assets/models/det.onnx', 'det.onnx');
-      final recPath = await _copyAssetToFile('assets/models/rec.onnx', 'rec.onnx');
-      final dictPath = await _copyAssetToFile('assets/models/dict.txt', 'dict.txt');
-
-      // v3.3.23: параметры для PP-OCRv6
-      final ocr = await PaddleOcr.create(
-        source: ModelSource.filePaths(det: detPath, rec: recPath, dict: dictPath),
-        detDbThresh: 0.2,
-        detDbBoxThresh: 0.4,
-        detDbUnclipRatio: 1.4,
+      final ocr = paddle_native.PaddleOcr();
+      await ocr.init(
+        config: const paddle_native.PaddleOcrConfig(),
+        engine: const paddle_native.EngineConfig(numThreads: 4),
       );
 
-      final results = await ocr.recognize(cropped, maxSideLen: 960);
-      final rightResults = rightPart != null ? await ocr.recognize(rightPart, maxSideLen: 960) : <OcrResult>[];
-      final iconResults = iconPart != null ? await ocr.recognize(iconPart, maxSideLen: 960) : <OcrResult>[];
+      final croppedFile = await _saveBytesToFile(cropped, 'main_crop.jpg');
+      final rightFile = rightPart != null ? await _saveBytesToFile(rightPart, 'right_crop.jpg') : null;
+      final iconFile = iconPart != null ? await _saveBytesToFile(iconPart, 'icon_crop.jpg') : null;
 
-      final sorted = List<OcrResult>.from(results);
-      final rightSorted = List<OcrResult>.from(rightResults);
+      final run = await ocr.recognize(croppedFile.path);
+      final rightRun = rightFile != null ? await ocr.recognize(rightFile.path) : null;
+      final iconRun = iconFile != null ? await ocr.recognize(iconFile.path) : null;
+
+      await ocr.dispose();
+
+      // Конвертируем результаты в OcrResult (формат парсера)
+      final results = run.results.map((r) => _toOcrResult(r)).toList();
+      final rightResults = rightRun?.results.map((r) => _toOcrResult(r)).toList() ?? [];
+      final iconResults = iconRun?.results.map((r) => _toOcrResult(r)).toList() ?? [];
 
       _dprint('########## OCR DEBUG START ##########');
-      _dprint('--- MAIN blocks: ${sorted.length} ---');
-      for (int i = 0; i < sorted.length; i++) _debugPrintBlock('MAIN', i, sorted[i]);
+      _dprint('--- MAIN blocks: ${results.length} ---');
+      for (int i = 0; i < results.length; i++) _debugPrintBlock('MAIN', i, results[i]);
       _dprint('########## OCR DEBUG END ##########');
 
-      final parsed = ArtifactParser.parse(
-        sorted,
-        rightBlocks: rightSorted,
-        iconBlocks: iconResults,
-      );
+      final parsed = ArtifactParser.parse(results, rightBlocks: rightResults, iconBlocks: iconResults);
 
       _dprint('########## PARSER DEBUG START ##########');
       final debugList = parsed['debug'] as List<String>?;
       if (debugList != null) {
-        for (final d in debugList) {
-          _dprint(d);
-        }
+        for (final d in debugList) _dprint(d);
       }
       _dprint('########## PARSER DEBUG END ##########');
 
-      final text = sorted.map((r) => r.text).join("\n") +
-          "\n" +
-          rightSorted.map((r) => r.text).join("\n") +
-          "\n" +
-          iconResults.map((r) => r.text).join("\n");
+      final text = results.map((r) => r.text).join("\n") + "\n" + rightResults.map((r) => r.text).join("\n");
 
       final parsedPretty = '''
 Сет: ${parsed['set'] ?? '?'}
@@ -200,8 +167,6 @@ class _HomePageState extends State<HomePage> {
 Проценты: ${parsed['stats_percent'] ?? {}}
 Доп-статы: ${parsed['dop_stats'] ?? {}}
 Глифы: ${parsed['glyphs']}
-Бонус сета: ${parsed['set_bonus'] ?? '?'}
-Надето: ${parsed['worn'] ?? '?'}
 ''';
 
       setState(() {
@@ -213,6 +178,25 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       setState(() => _status = 'Ошибка OCR: $e');
     }
+  }
+
+  paddle_native.OcrResult _toOcrResult(paddle_native.OcrResult r) {
+    final points = r.points.map((p) => Offset(p.x.toDouble(), p.y.toDouble())).toList();
+    return OcrResult(text: r.text, confidence: r.confidence, points: points);
+  }
+
+  void _debugPrintBlock(String tag, int i, OcrResult r) {
+    if (r.points.isEmpty) {
+      _dprint('=== $tag #$i | text="${r.text}" | POINTS EMPTY ===');
+      return;
+    }
+    final xs = r.points.map((p) => p.dx).toList();
+    final ys = r.points.map((p) => p.dy).toList();
+    final minX = xs.reduce((a, b) => a < b ? a : b);
+    final maxX = xs.reduce((a, b) => a > b ? a : b);
+    final minY = ys.reduce((a, b) => a < b ? a : b);
+    final maxY = ys.reduce((a, b) => a > b ? a : b);
+    _dprint('=== $tag #$i | text="${r.text}" | conf=${r.confidence.toStringAsFixed(2)} | x[${minX.toStringAsFixed(0)}..${maxX.toStringAsFixed(0)}] y[${minY.toStringAsFixed(0)}..${maxY.toStringAsFixed(0)}] ===');
   }
 
   @override
@@ -243,24 +227,13 @@ class _HomePageState extends State<HomePage> {
                   padding: const EdgeInsets.all(16.0),
                   child: Text(_parsedText, style: const TextStyle(fontSize: 14)),
                 ),
-              if (_ocrText.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    'Сырой текст:\n$_ocrText',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ),
               if (_debugLog.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     color: Colors.black12,
-                    child: Text(
-                      'DEBUG LOG:\n$_debugLog',
-                      style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
-                    ),
+                    child: Text('DEBUG LOG:\n$_debugLog', style: const TextStyle(fontSize: 10, fontFamily: 'monospace')),
                   ),
                 ),
             ],
