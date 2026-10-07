@@ -328,7 +328,7 @@ class ArtifactParser {
       }
 
       if (statName != null && cx >= xSplit && _isStatWithNumber(r.text, debugOut)) {
-        final val = _extractNumber(r);
+        final val = _extractNumber(r, debugOut);
         if (val != null) {
           debugOut.add('[ITER] #$idx → DOP-STAT $statName = $val');
           if (statName == 'Метк' || statName == 'ACC') {
@@ -336,6 +336,13 @@ class ArtifactParser {
           } else {
             statsOut.putIfAbsent(statName, () => []).add(val);
           }
+          continue;
+        }
+        // ФИКС v3.5.5-2: glyph-only (C. DMG(1)) и cx < 350 → в leftBlocks
+        if (val == null && cx < 350.0) {
+          debugOut.add('[ITER] #$idx → LEFT-FALLBACK $statName (cx=$cx < 350)');
+          leftBlocks.add(r);
+          continue;
         }
         continue;
       }
