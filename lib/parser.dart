@@ -139,6 +139,49 @@ class ArtifactParser {
   static double _centerY(pn.OcrResult r) => (_minY(r) + _maxY(r)) / 2;
   static double _centerX(pn.OcrResult r) => (_minX(r) + _maxX(r)) / 2;
 
+  // ФИКС v3.5.8: FUZZY matching (расстояние Левенштейна)
+  static int _levenshtein(String a, String b) {
+    if (a == b) return 0;
+    if (a.isEmpty) return b.length;
+    if (b.isEmpty) return a.length;
+    final prev = List<int>.generate(b.length + 1, (i) => i);
+    final curr = List<int>.filled(b.length + 1, 0);
+    for (int i = 1; i <= a.length; i++) {
+      curr[0] = i;
+      for (int j = 1; j <= b.length; j++) {
+        final cost = a[i - 1] == b[j - 1] ? 0 : 1;
+        curr[j] = [
+          curr[j - 1] + 1,
+          prev[j] + 1,
+          prev[j - 1] + cost,
+        ].reduce((v, e) => v < e ? v : e);
+      }
+      for (int k = 0; k <= b.length; k++) {
+        prev[k] = curr[k];
+      }
+    }
+    return prev[b.length];
+  }
+
+  // ФИКС v3.5.8: fuzzy поиск стата (расстояние ≤ 2)
+  static String? _fuzzyFindStat(String normalized, [List<String>? debugOut]) {
+    String? best;
+    int bestDist = 3;  // порог ≤ 2
+    for (final stat in statNames) {
+      final statNorm = stat.replaceAll(RegExp(r'[\s\.]'), '').toUpperCase();
+      final dist = _levenshtein(normalized, statNorm);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = stat;
+      }
+    }
+    if (best != null) {
+      debugOut?.add('[FUZZY] "$normalized" → "$best" (dist=$bestDist)');
+      return best;
+    }
+    return null;
+  }
+
   static String? _findStatName(pn.OcrResult r, [List<String>? debugOut]) {
     final text = _cleanText(r.text);
     debugOut?.add('[FINDSTAT] input="$text"');
@@ -178,8 +221,26 @@ class ArtifactParser {
         return stat;
       }
     }
+    // ФИКС v3.5.8: fuzzy fallback
+    final fuzzy = _fuzzyFindStat(normalized, debugOut);
+    if (fuzzy != null) {
+      debugOut?.add('[FINDSTAT] → FUZZY "$fuzzy"');
+      return fuzzy;
+    }
     debugOut?.add('[FINDSTAT] → null (no match)');
     return null;
+  }
+
+  // ФИКС v3.5.8: нормализация для _isStatWithNumber
+  static String _normForIsStat(String s) {
+    return s
+        .replaceAll('À', 'A').replaceAll('Á', 'A').replaceAll('Â', 'A')
+        .replaceAll('È', 'E').replaceAll('É', 'E').replaceAll('Ê', 'E')
+        .replaceAll('Ì', 'I').replaceAll('Í', 'I').replaceAll('Î', 'I')
+        .replaceAll('Ò', 'O').replaceAll('Ó', 'O').replaceAll('Ô', 'O')
+        .replaceAll('Ù', 'U').replaceAll('Ú', 'U').replaceAll('Û', 'U')
+        .replaceAll('Ġ', 'G').replaceAll('ġ', 'g')
+        .replaceAll(RegExp(r'[\s\.]'), '').toUpperCase();
   }
 
   static bool _hasPercent(pn.OcrResult r, [List<String>? debugOut]) {
@@ -237,9 +298,13 @@ class ArtifactParser {
   static bool _isStatWithNumber(String text, [List<String>? debugOut]) {
     final cleaned = _cleanText(text);
     debugOut?.add('[ISSTAT] input="$cleaned"');
+    // ФИКС v3.5.8: нормализация для сравнения
+    final normCleaned = _normForIsStat(cleaned);
     for (final stat in statNames) {
-      if (cleaned.startsWith(stat)) {
-        final rest = cleaned.substring(stat.length).trim();
+      final normStat = _normForIsStat(stat);
+      if (normCleaned.startsWith(normStat)) {
+        // ФИКС v3.5.8: rest берём из normCleaned (нормализовано)
+        final rest = normCleaned.substring(normStat.length).trim();
         final stripped = rest.replaceAll(RegExp(r'\(\d+\)?'), '').trim();
         debugOut?.add('[ISSTAT]   stat="$stat" rest="$rest" stripped="$stripped"');
         if (RegExp(r'^\d+$').hasMatch(stripped)) {
