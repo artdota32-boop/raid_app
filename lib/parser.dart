@@ -260,6 +260,32 @@ class ArtifactParser {
     return false;
   }
 
+  // ФИКС v3.5.5-4: определение глифа "N%+M%" или "N+M"
+  static bool _hasGlyphPattern(String text, [List<String>? debugOut]) {
+    final t = _cleanText(text).trim();
+    // Паттерн: число%+число% или число+число
+    final re = RegExp(r'^(\d+%?)\+(\d+%?)$');
+    final match = re.hasMatch(t);
+    debugOut?.add('[GLYPH] check "$t" → $match');
+    return match;
+  }
+
+  // ФИКС v3.5.5-4: извлечь базу и глиф
+  static Map<String, int> _extractBaseAndGlyph(String text, [List<String>? debugOut]) {
+    final t = _cleanText(text).trim();
+    final re = RegExp(r'^(\d+)%?\+(\d+)%?$');
+    final m = re.firstMatch(t);
+    if (m == null) {
+      debugOut?.add('[GLYPH] extract "$t" → null');
+      return {};
+    }
+    final base = int.tryParse(m.group(1) ?? '');
+    final glyph = int.tryParse(m.group(2) ?? '');
+    debugOut?.add('[GLYPH] extract "$t" → base=$base glyph=$glyph');
+    if (base == null || glyph == null) return {};
+    return {'base': base, 'glyph': glyph};
+  }
+
   static void _parseStats(
     List<pn.OcrResult> mainBlocks,
     Map<String, List<int>> statsOut,
@@ -293,6 +319,37 @@ class ArtifactParser {
       }
 
       debugOut.add('[ZONE] #$idx text="$text" cx=${cx.toStringAsFixed(0)} cy=${cy.toStringAsFixed(0)} statName=${_findStatName(r)}');
+
+      // === ФИКС v3.5.5-4: глиф "N%+M%" или "N+M" ===
+      if (_hasGlyphPattern(r.text, debugOut) && cx >= xSplit) {
+        final pair = _extractBaseAndGlyph(r.text, debugOut);
+        if (pair.isNotEmpty) {
+          // Ищем имя стата по Y-совпадению в leftBlocks
+          String? glyphStat;
+          double bestDy = double.infinity;
+          for (final lb in leftBlocks) {
+            final dy = (_centerY(lb) - cy).abs();
+            if (dy < yThreshold && dy < bestDy) {
+              glyphStat = _findStatName(lb);
+              bestDy = dy;
+            }
+          }
+          if (glyphStat != null) {
+            debugOut.add('[ITER] #$idx → GLYPH $glyphStat base=${pair['base']} glyph=${pair['glyph']}');
+            final baseVal = pair['base']!;
+            final glyphVal = pair['glyph']!;
+            // База → stats/percent
+            if (_hasPercent(r, debugOut)) {
+              percentOut.putIfAbsent(glyphStat, () => []).add(baseVal);
+            } else {
+              statsOut.putIfAbsent(glyphStat, () => []).add(baseVal);
+            }
+            // Глиф → glyphsOut
+            glyphsOut.putIfAbsent(glyphStat, () => []).add(glyphVal);
+            continue;
+          }
+        }
+      }
 
       // === ПРОВЕРКА: доп-стат от звёзд формата "N NAME VALUE" (напр. "3 ATK 11") ===
       final starDopRe = RegExp(r'^([1-6])\s+([A-Z][A-Z.\s]*?)\s+(\d+)$');
