@@ -219,6 +219,11 @@ class ArtifactParser {
           debugOut?.add('[ISSTAT]   → TRUE (num=$num)');
           return true;
         }
+        // ФИКС v3.5.4: если осталась только скобка "(N)" без числа — валидный стат
+        if (rest.isNotEmpty && RegExp(r'^\(\d+\)?$').hasMatch(rest)) {
+          debugOut?.add('[ISSTAT]   → TRUE (glyph-only "$rest")');
+          return true;
+        }
       }
     }
     debugOut?.add('[ISSTAT] → false (no match)');
@@ -288,7 +293,7 @@ class ArtifactParser {
       final statName = _findStatName(r);
 
       // === ПРОВЕРКА: главный стат (DEF 143, ATK 143) — верхняя зона справа ===
-      final isMainStatZone = cy < 220.0 && cx > 180.0;
+      final isMainStatZone = cy < 220.0 && cx > 180.0 && cx < 350.0;
       if (isMainStatZone && statName != null && _isStatWithNumber(r.text, debugOut)) {
         final val = _extractNumber(r);
         if (val != null) {
