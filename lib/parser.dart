@@ -291,6 +291,7 @@ class ArtifactParser {
     Map<String, List<int>> statsOut,
     Map<String, List<int>> percentOut,
     Map<String, List<int>> dopStatsOut,
+    Map<String, List<int>> glyphsOut,
     List<String> debugOut,
   ) {
     debugOut.add('[PARSER] _parseStats START, mainBlocks=${mainBlocks.length}');
@@ -559,7 +560,7 @@ class ArtifactParser {
         result['set'] = setName.isEmpty ? null : setName;
       }
 
-      _parseStats(mainBlocks, stats, percents, dopStats, debug);
+      _parseStats(mainBlocks, stats, percents, dopStats, glyphs, debug);
 
       if (result['level'] == null && iconBlocks.isNotEmpty) {
         for (final r in iconBlocks) {
