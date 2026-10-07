@@ -315,8 +315,14 @@ class ArtifactParser {
       if (isMainStatZone && statName != null && _isStatWithNumber(r.text, debugOut)) {
         final val = _extractNumber(r, debugOut);
         if (val != null) {
-          debugOut.add('[ITER] #$idx → MAIN-STAT $statName = $val [ZONE cx=$cx cy=$cy]');
-          statsOut.putIfAbsent(statName, () => []).add(val);
+          // ФИКС v3.5.5-1b: если есть "%" → в percentOut
+          if (_hasPercent(r, debugOut)) {
+            debugOut.add('[ITER] #$idx → MAIN-STAT% $statName = $val [ZONE cx=$cx cy=$cy]');
+            percentOut.putIfAbsent(statName, () => []).add(val);
+          } else {
+            debugOut.add('[ITER] #$idx → MAIN-STAT $statName = $val [ZONE cx=$cx cy=$cy]');
+            statsOut.putIfAbsent(statName, () => []).add(val);
+          }
           continue;
         }
       }
