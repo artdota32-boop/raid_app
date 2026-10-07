@@ -261,6 +261,20 @@ class ArtifactParser {
         }
       }
 
+      // === ПРОВЕРКА: доп-стат от звёзд формата "N NAME VALUE" (напр. "3 ATK 11") ===
+      final starDopRe = RegExp(r'^([1-6])\s+([A-Z][A-Z.\s]*?)\s+(\d+)$');
+      final starDopMatch = starDopRe.firstMatch(text.trim());
+      if (starDopMatch != null) {
+        final stars = int.tryParse(starDopMatch.group(1) ?? '');
+        final dopName = starDopMatch.group(2)?.trim() ?? '';
+        final dopVal = int.tryParse(starDopMatch.group(3) ?? '');
+        if (stars != null && dopName.isNotEmpty && dopVal != null) {
+          debugOut.add('[ITER] #$idx → STAR-DOP $dopName = $dopVal (stars=$stars)');
+          dopStatsOut.putIfAbsent(dopName, () => []).add(dopVal);
+          continue;
+        }
+      }
+
       final statName = _findStatName(r);
 
       // === ПРОВЕРКА: главный стат (DEF 143, ATK 143) — верхняя зона справа ===
