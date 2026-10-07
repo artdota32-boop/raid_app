@@ -442,7 +442,9 @@ class ArtifactParser {
         if (allText.contains(r)) { result['rarity'] = r; break; }
       }
 
-      final lvlMatch = RegExp(r'\+(\d{1,2})').firstMatch(allText);
+      // ФИКС v3.5.5-3: OCR может дать "+1.2" вместо "+12" — убираем точки
+      final cleanAllText = allText.replaceAll('.', '');
+      final lvlMatch = RegExp(r'\+(\d{1,2})').firstMatch(cleanAllText);
       if (lvlMatch != null) {
         final lvl = int.tryParse(lvlMatch.group(1) ?? '');
         if (lvl != null && [4, 8, 12, 16].contains(lvl)) {
