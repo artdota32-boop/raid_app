@@ -237,6 +237,11 @@ class ArtifactParser {
           debugOut?.add('[ISSTAT]   → TRUE (glyph-only "$rest")');
           return true;
         }
+        // ФИКС v3.5.5: число с процентом "33%" или "33%+4%" — валидный стат
+        if (RegExp(r'^\d+\%').hasMatch(stripped)) {
+          debugOut?.add('[ISSTAT]   → TRUE (percent "$stripped")');
+          return true;
+        }
       }
     }
     debugOut?.add('[ISSTAT] → false (no match)');
