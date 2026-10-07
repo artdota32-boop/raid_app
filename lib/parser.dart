@@ -202,19 +202,26 @@ class ArtifactParser {
     return result;
   }
 
-  static bool _isStatWithNumber(String text) {
+  static bool _isStatWithNumber(String text, [List<String>? debugOut]) {
     final cleaned = _cleanText(text);
+    debugOut?.add('[ISSTAT] input="$cleaned"');
     for (final stat in statNames) {
       if (cleaned.startsWith(stat)) {
         final rest = cleaned.substring(stat.length).trim();
         final stripped = rest.replaceAll(RegExp(r'\(\d+\)?'), '').trim();
+        debugOut?.add('[ISSTAT]   stat="$stat" rest="$rest" stripped="$stripped"');
         if (RegExp(r'^\d+$').hasMatch(stripped)) {
           final num = int.tryParse(stripped);
-          if (num != null && num <= 9) return false;
+          if (num != null && num <= 9) {
+            debugOut?.add('[ISSTAT]   → false (num<=9: $num)');
+            return false;
+          }
+          debugOut?.add('[ISSTAT]   → TRUE (num=$num)');
           return true;
         }
       }
     }
+    debugOut?.add('[ISSTAT] → false (no match)');
     return false;
   }
 
@@ -262,6 +269,8 @@ class ArtifactParser {
         }
       }
 
+      debugOut.add('[ZONE] #$idx text="$text" cx=${cx.toStringAsFixed(0)} cy=${cy.toStringAsFixed(0)} statName=${_findStatName(r)}');
+
       // === ПРОВЕРКА: доп-стат от звёзд формата "N NAME VALUE" (напр. "3 ATK 11") ===
       final starDopRe = RegExp(r'^([1-6])\s+([A-Z][A-Z.\s]*?)\s+(\d+)$');
       final starDopMatch = starDopRe.firstMatch(text.trim());
@@ -280,16 +289,16 @@ class ArtifactParser {
 
       // === ПРОВЕРКА: главный стат (DEF 143, ATK 143) — верхняя зона справа ===
       final isMainStatZone = cy < 220.0 && cx > 180.0;
-      if (isMainStatZone && statName != null && _isStatWithNumber(r.text)) {
+      if (isMainStatZone && statName != null && _isStatWithNumber(r.text, debugOut)) {
         final val = _extractNumber(r);
         if (val != null) {
-          debugOut.add('[ITER] #$idx → MAIN-STAT $statName = $val');
+          debugOut.add('[ITER] #$idx → MAIN-STAT $statName = $val [ZONE cx=$cx cy=$cy]');
           statsOut.putIfAbsent(statName, () => []).add(val);
           continue;
         }
       }
 
-      if (statName != null && cx >= xSplit && _isStatWithNumber(r.text)) {
+      if (statName != null && cx >= xSplit && _isStatWithNumber(r.text, debugOut)) {
         final val = _extractNumber(r);
         if (val != null) {
           debugOut.add('[ITER] #$idx → DOP-STAT $statName = $val');
@@ -302,7 +311,7 @@ class ArtifactParser {
         continue;
       }
 
-      if (_isStatWithNumber(r.text) && cx < xSplit) {
+      if (_isStatWithNumber(r.text, debugOut) && cx < xSplit) {
         leftBlocks.add(r);
         continue;
       }
@@ -324,7 +333,7 @@ class ArtifactParser {
       final leftY = _centerY(left);
 
       final selfValue = _extractNumber(left);
-      if (_isStatWithNumber(left.text) && selfValue != null) {
+      if (_isStatWithNumber(left.text, debugOut) && selfValue != null) {
         debugOut.add('[PARSER] MATCH (self): $statName = $selfValue');
         final list = statsOut.putIfAbsent(statName, () => []);
         if (!list.contains(selfValue)) list.add(selfValue);
