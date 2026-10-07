@@ -489,6 +489,7 @@ class ArtifactParser {
       final stats = result['stats'] as Map<String, List<int>>;
       final percents = result['stats_percent'] as Map<String, List<int>>;
       final dopStats = result['dop_stats'] as Map<String, List<int>>;
+      final glyphs = result['glyphs'] as Map<String, List<int>>;
       final debug = result['debug'] as List<String>;
 
       final allText = mainBlocks.map((r) => _cleanText(r.text)).join(' | ');
