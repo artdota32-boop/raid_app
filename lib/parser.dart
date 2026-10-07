@@ -148,11 +148,24 @@ class ArtifactParser {
 
     String norm(String s) => s
         // ФИКС v3.5.6: латинские с ударением → обычные
+        // ФИКС v3.5.6: Á→A
         .replaceAll('Á', 'A').replaceAll('á', 'a')
         .replaceAll('É', 'E').replaceAll('é', 'e')
         .replaceAll('Í', 'I').replaceAll('í', 'i')
         .replaceAll('Ó', 'O').replaceAll('ó', 'o')
         .replaceAll('Ú', 'U').replaceAll('ú', 'u')
+        // ФИКС v3.5.7: À→A (гравис)
+        .replaceAll('À', 'A').replaceAll('à', 'a')
+        .replaceAll('È', 'E').replaceAll('è', 'e')
+        .replaceAll('Ì', 'I').replaceAll('ì', 'i')
+        .replaceAll('Ò', 'O').replaceAll('ò', 'o')
+        .replaceAll('Ù', 'U').replaceAll('ù', 'u')
+        // Йотированные
+        .replaceAll('Â', 'A').replaceAll('â', 'a')
+        .replaceAll('Ê', 'E').replaceAll('ê', 'e')
+        .replaceAll('Î', 'I').replaceAll('î', 'i')
+        .replaceAll('Ô', 'O').replaceAll('ô', 'o')
+        .replaceAll('Û', 'U').replaceAll('û', 'u')
         .replaceAll(RegExp(r'[\s\.]'), '').toUpperCase();
 
     final normalized = norm(cleaned);
@@ -318,6 +331,22 @@ class ArtifactParser {
         final nums = _extractAllNumbers(r);
         final statName = _findStatName(r, debugOut);
         if (statName != null && nums.length >= 2) {
+          // ФИКС v3.5.7: если в блоке ДВА имени статов — разделить
+          final cleanT = _cleanText(r.text).toUpperCase();
+          final foundStats = <String>[];
+          for (final s in statNames) {
+            if (cleanT.contains(s.replaceAll('.', '').replaceAll(' ', '').toUpperCase())) {
+              foundStats.add(s);
+            }
+          }
+          if (foundStats.length >= 2) {
+            // Два разных стата: первое → stats, второе → dop
+            debugOut.add('[ITER] #$idx → TWO-STAT: ${foundStats[0]}=${nums[0]} ${foundStats[1]}=${nums[1]}');
+            statsOut.putIfAbsent(foundStats[0], () => []).add(nums[0]);
+            dopStatsOut.putIfAbsent(foundStats[1], () => []).add(nums[1]);
+            continue;
+          }
+          // Иначе — обычный TWO-NUM (осн + доп того же стата)
           debugOut.add('[ITER] #$idx → TWO-NUM: $statName = ${nums[0]} (dop=${nums[1]})');
           statsOut.putIfAbsent(statName, () => []).add(nums[0]);
           dopStatsOut.putIfAbsent(statName, () => []).add(nums[1]);
@@ -497,8 +526,16 @@ class ArtifactParser {
 
       final allText = mainBlocks.map((r) => _cleanText(r.text)).join(' | ');
 
-      for (final t in types) {
-        if (allText.contains(t)) { result['type'] = t; break; }
+      // ФИКС v3.5.7: тип ищем ТОЛЬКО в верхней зоне (cy < 120)
+      for (final r in mainBlocks) {
+        if (r.points.isEmpty) continue;
+        final cy = _centerY(r);
+        if (cy > 120) continue;
+        final text = _cleanText(r.text);
+        for (final t in types) {
+          if (text.contains(t)) { result['type'] = t; break; }
+        }
+        if (result['type'] != null) break;
       }
       for (final r in rarities) {
         if (allText.contains(r)) { result['rarity'] = r; break; }
