@@ -42,7 +42,7 @@ class _HomePageState extends State<HomePage> {
   void _dprint(String line) {
     debugPrint(line);
     _debugBuffer.add(line);
-    if (_debugBuffer.length > 300) _debugBuffer.removeAt(0);
+    if (_debugBuffer.length > 3000) _debugBuffer.removeAt(0);
   }
 
   Future<void> _pickVideo() async {

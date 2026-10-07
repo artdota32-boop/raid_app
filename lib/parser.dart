@@ -139,38 +139,50 @@ class ArtifactParser {
   static double _centerY(pn.OcrResult r) => (_minY(r) + _maxY(r)) / 2;
   static double _centerX(pn.OcrResult r) => (_minX(r) + _maxX(r)) / 2;
 
-  static String? _findStatName(pn.OcrResult r) {
+  static String? _findStatName(pn.OcrResult r, [List<String>? debugOut]) {
     final text = _cleanText(r.text);
-    if (text.isEmpty) return null;
+    debugOut?.add('[FINDSTAT] input="$text"');
+    if (text.isEmpty) { debugOut?.add('[FINDSTAT] → null (empty)'); return null; }
     final cleaned = _stripGlyphMarkers(text);
-    if (cleaned.isEmpty) return null;
+    if (cleaned.isEmpty) { debugOut?.add('[FINDSTAT] → null (cleaned empty)'); return null; }
 
     String norm(String s) =>
         s.replaceAll(RegExp(r'[\s\.]'), '').toUpperCase();
 
     final normalized = norm(cleaned);
+    debugOut?.add('[FINDSTAT] cleaned="$cleaned" normalized="$normalized"');
 
     for (final stat in statNames) {
-      if (normalized.contains(norm(stat))) return stat;
+      final statNorm = norm(stat);
+      if (normalized.contains(statNorm)) {
+        debugOut?.add('[FINDSTAT] → MATCH "$stat" (statNorm="$statNorm")');
+        return stat;
+      }
     }
+    debugOut?.add('[FINDSTAT] → null (no match)');
     return null;
   }
 
-  static bool _hasPercent(pn.OcrResult r) {
+  static bool _hasPercent(pn.OcrResult r, [List<String>? debugOut]) {
     final t = _cleanText(r.text);
-    return t.contains('%') || t.endsWith(',');
+    final result = t.contains('%') || t.endsWith(',');
+    debugOut?.add('[HASPERCENT] text="$t" → $result');
+    return result;
   }
 
-  static int? _extractNumber(pn.OcrResult r) {
+  static int? _extractNumber(pn.OcrResult r, [List<String>? debugOut]) {
     String text = _cleanText(r.text);
+    final original = text;
     text = text.replaceAll(RegExp(r'\(\d+\)?'), ' ');
     text = text.replaceAll(RegExp(r'\d+\)'), ' ');
     text = text.replaceAll(RegExp(r'\(\d+'), ' ');
     text = text.trim();
-    if (text.isEmpty) return null;
+    debugOut?.add('[EXTRACT] input="$original" cleaned="$text"');
+    if (text.isEmpty) { debugOut?.add('[EXTRACT] → null (empty)'); return null; }
 
     final matches = RegExp(r'\d+').allMatches(text).toList();
-    if (matches.isEmpty) return null;
+    debugOut?.add('[EXTRACT] matches=${matches.map((m) => m.group(0)).toList()}');
+    if (matches.isEmpty) { debugOut?.add('[EXTRACT] → null (no matches)'); return null; }
 
     int? best;
     for (final m in matches) {
@@ -179,11 +191,12 @@ class ArtifactParser {
       if (val < 10) continue;
       if (best == null || val > best) best = val;
     }
-    if (best != null) return best;
+    if (best != null) { debugOut?.add('[EXTRACT] → best=$best'); return best; }
     for (final m in matches) {
       final val = int.tryParse(m.group(0) ?? '');
-      if (val != null && val > 0) return val;
+      if (val != null && val > 0) { debugOut?.add('[EXTRACT] → fallback=$val'); return val; }
     }
+    debugOut?.add('[EXTRACT] → null');
     return null;
   }
 
@@ -265,7 +278,7 @@ class ArtifactParser {
 
       if (_isStatWithTwoNumbers(r.text)) {
         final nums = _extractAllNumbers(r);
-        final statName = _findStatName(r);
+        final statName = _findStatName(r, debugOut);
         if (statName != null && nums.length >= 2) {
           debugOut.add('[ITER] #$idx → TWO-NUM: $statName = ${nums[0]} (dop=${nums[1]})');
           statsOut.putIfAbsent(statName, () => []).add(nums[0]);
@@ -295,7 +308,7 @@ class ArtifactParser {
       // === ПРОВЕРКА: главный стат (DEF 143, ATK 143) — верхняя зона справа ===
       final isMainStatZone = cy < 220.0 && cx > 180.0 && cx < 350.0;
       if (isMainStatZone && statName != null && _isStatWithNumber(r.text, debugOut)) {
-        final val = _extractNumber(r);
+        final val = _extractNumber(r, debugOut);
         if (val != null) {
           debugOut.add('[ITER] #$idx → MAIN-STAT $statName = $val [ZONE cx=$cx cy=$cy]');
           statsOut.putIfAbsent(statName, () => []).add(val);
@@ -337,7 +350,7 @@ class ArtifactParser {
       if (statName == null) continue;
       final leftY = _centerY(left);
 
-      final selfValue = _extractNumber(left);
+      final selfValue = _extractNumber(left, debugOut);
       if (_isStatWithNumber(left.text, debugOut) && selfValue != null) {
         debugOut.add('[PARSER] MATCH (self): $statName = $selfValue');
         final list = statsOut.putIfAbsent(statName, () => []);
@@ -360,12 +373,12 @@ class ArtifactParser {
         continue;
       }
 
-      final value = _extractNumber(bestNum);
+      final value = _extractNumber(bestNum, debugOut);
       if (value == null) continue;
 
       debugOut.add('[PARSER] MATCH: $statName = $value (from "${bestNum.text}" dy=$bestDist)');
 
-      if (_hasPercent(bestNum)) {
+      if (_hasPercent(bestNum, debugOut)) {
         final list = percentOut.putIfAbsent(statName, () => []);
         if (!list.contains(value)) list.add(value);
       } else {
