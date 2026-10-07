@@ -146,8 +146,14 @@ class ArtifactParser {
     final cleaned = _stripGlyphMarkers(text);
     if (cleaned.isEmpty) { debugOut?.add('[FINDSTAT] → null (cleaned empty)'); return null; }
 
-    String norm(String s) =>
-        s.replaceAll(RegExp(r'[\s\.]'), '').toUpperCase();
+    String norm(String s) => s
+        // ФИКС v3.5.6: латинские с ударением → обычные
+        .replaceAll('Á', 'A').replaceAll('á', 'a')
+        .replaceAll('É', 'E').replaceAll('é', 'e')
+        .replaceAll('Í', 'I').replaceAll('í', 'i')
+        .replaceAll('Ó', 'O').replaceAll('ó', 'o')
+        .replaceAll('Ú', 'U').replaceAll('ú', 'u')
+        .replaceAll(RegExp(r'[\s\.]'), '').toUpperCase();
 
     final normalized = norm(cleaned);
     debugOut?.add('[FINDSTAT] cleaned="$cleaned" normalized="$normalized"');
@@ -389,11 +395,8 @@ class ArtifactParser {
         final val = _extractNumber(r, debugOut);
         if (val != null) {
           debugOut.add('[ITER] #$idx → DOP-STAT $statName = $val');
-          if (statName == 'Метк' || statName == 'ACC') {
-            dopStatsOut.putIfAbsent(statName, () => []).add(val);
-          } else {
-            statsOut.putIfAbsent(statName, () => []).add(val);
-          }
+          // ФИКС v3.5.6: любой DOP-стат → в dopStatsOut
+          dopStatsOut.putIfAbsent(statName, () => []).add(val);
           continue;
         }
         // ФИКС v3.5.5-2: glyph-only (C. DMG(1)) и cx < 350 → в leftBlocks
