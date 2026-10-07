@@ -76,6 +76,7 @@ class ArtifactParser {
     'Щит', 'Кольцо', 'Амулет', 'Знамя',
     'Chestplate', 'Weapon', 'Helmet', 'Gloves', 'Boots',
     'Shield', 'Ring', 'Amulet', 'Banner',
+    'Gauntlets', 'Gauntlet',
   ];
 
   static const List<String> rarities = [
@@ -419,6 +420,11 @@ class ArtifactParser {
         final bonusEn = RegExp(r'New Bonus for every (\w+)').firstMatch(allText);
         if (bonusEn != null) {
           result['set_bonus'] = bonusEn.group(1);
+        } else {
+          final bonusPieces = RegExp(r'(\d+)\s+Artifacts per Set').firstMatch(allText);
+          if (bonusPieces != null) {
+            result['set_bonus'] = '${bonusPieces.group(1)} pcs';
+          }
         }
       }
 
