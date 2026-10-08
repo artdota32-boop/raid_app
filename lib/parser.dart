@@ -470,7 +470,7 @@ class ArtifactParser {
       final statName = _findStatName(r);
 
       // === ПРОВЕРКА: главный стат (DEF 143, ATK 143) — верхняя зона справа ===
-      final isMainStatZone = cy < 220.0 && cx > 180.0 && cx < 350.0;
+      final isMainStatZone = cy > 660.0 && cy < 745.0 && cx > 180.0 && cx < 500.0;
       if (isMainStatZone && statName != null && _isStatWithNumber(r.text, debugOut)) {
         final val = _extractNumber(r, debugOut);
         if (val != null) {
