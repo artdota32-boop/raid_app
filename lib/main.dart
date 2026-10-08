@@ -92,8 +92,11 @@ class _HomePageState extends State<HomePage> {
   Uint8List? _cropIcon(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
-    final cropped = img.copyCrop(decoded, x: 113, y: 490, width: 214 - 113, height: 540 - 490);
-    return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
+    // ФИКС v3.5.9: область уровня +12 (было x:113 y:490)
+    final cropped = img.copyCrop(decoded, x: 30, y: 140, width: 180 - 30, height: 210 - 140);
+    // ФИКС v3.5.9: увеличение ×3
+    final resized = img.copyResize(cropped, width: cropped.width * 3);
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 95));
   }
 
   Uint8List? _cropRightPart(Uint8List bytes) {
