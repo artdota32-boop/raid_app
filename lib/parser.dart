@@ -592,11 +592,11 @@ class ArtifactParser {
 
       final allText = mainBlocks.map((r) => _cleanText(r.text)).join(' | ');
 
-      // ФИКС v3.5.7: тип ищем ТОЛЬКО в верхней зоне (cy < 120)
+      // ФИКС v3.5.9-4: тип ищем в зоне карточки (cy < 700 — под новый MAIN-кроп)
       for (final r in mainBlocks) {
         if (r.points.isEmpty) continue;
         final cy = _centerY(r);
-        if (cy > 120) continue;
+        if (cy > 700) continue;
         final text = _cleanText(r.text);
         for (final t in types) {
           if (text.contains(t)) { result['type'] = t; break; }
