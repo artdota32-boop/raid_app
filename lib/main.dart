@@ -35,6 +35,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   File? _videoFile;
   Uint8List? _croppedBytes;
+  Uint8List? _originalFrameBytes;
   String _status = 'Выбери видео';
   String _ocrText = '';
   String _parsedText = '';
@@ -78,6 +79,7 @@ class _HomePageState extends State<HomePage> {
         setState(() => _status = 'Не удалось вырезать кадр');
         return;
       }
+      _originalFrameBytes = bytes;
       final cropped = await _cropBottomLeft(bytes);
       final rightPart = _cropRightPart(bytes);
       final iconPart = _cropIcon(bytes);
@@ -232,7 +234,7 @@ class _HomePageState extends State<HomePage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => CropCalibrator(frameBytes: _croppedBytes),
+                      builder: (_) => CropCalibrator(frameBytes: _originalFrameBytes),
                     ),
                   );
                 },
