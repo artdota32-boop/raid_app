@@ -5,7 +5,7 @@ import 'package:paddle_ocr_native/paddle_ocr_native.dart' as pn;
 class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
-  static const double xSplit = 130.0;
+  static const double xSplit = 250.0;
   // ФИКС v3.5.9-3: фильтры под новый MAIN-кроп (y:100..780)
   static const double yMaxForSet = 700.0;
   static const double yMinForStats = 900.0;
