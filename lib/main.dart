@@ -115,11 +115,11 @@ class _HomePageState extends State<HomePage> {
     if (decoded == null) return null;
     // ФИКС v3.5.9: расширен MAIN — захват +12 (было y:360)
     final prefs = await SharedPreferences.getInstance();
-    final cx = prefs.getInt("crop_x") ?? 40;
-    final cy = prefs.getInt("crop_y") ?? 100;
-    final cw = prefs.getInt("crop_w") ?? 460;
-    final ch = prefs.getInt("crop_h") ?? 680;
-    final cropped = img.copyCrop(decoded, x: cx, y: cy, width: cw, height: ch);
+    final cx = prefs.getInt("crop_x") ?? 100;
+    final cy = prefs.getInt("crop_y") ?? 531;
+    final cw = prefs.getInt("crop_w") ?? 420;
+    final ch = prefs.getInt("crop_h") ?? 679;
+    final cropped = img.copyCrop(decoded, x: 40, y: 355, width: 470, height: 360);
     final resized = img.copyResize(cropped, width: cropped.width * 2);
     return Uint8List.fromList(img.encodeJpg(resized, quality: 95));
   }
