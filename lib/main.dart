@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:snapframes/snapframes.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'crop_calibrator.dart';
 import 'package:image/image.dart' as img;
 import 'package:paddle_ocr_native/paddle_ocr_native.dart' as pn;
 import 'parser.dart';
@@ -76,7 +78,7 @@ class _HomePageState extends State<HomePage> {
         setState(() => _status = 'Не удалось вырезать кадр');
         return;
       }
-      final cropped = _cropBottomLeft(bytes);
+      final cropped = await _cropBottomLeft(bytes);
       final rightPart = _cropRightPart(bytes);
       final iconPart = _cropIcon(bytes);
       setState(() {
@@ -106,11 +108,16 @@ class _HomePageState extends State<HomePage> {
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
-  Uint8List? _cropBottomLeft(Uint8List bytes) {
+  Future<Uint8List?> _cropBottomLeft(Uint8List bytes) async {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
     // ФИКС v3.5.9: расширен MAIN — захват +12 (было y:360)
-    final cropped = img.copyCrop(decoded, x: 40, y: 100, width: 500 - 40, height: 780 - 100);
+    final prefs = await SharedPreferences.getInstance();
+    final cx = prefs.getInt("crop_x") ?? 40;
+    final cy = prefs.getInt("crop_y") ?? 100;
+    final cw = prefs.getInt("crop_w") ?? 460;
+    final ch = prefs.getInt("crop_h") ?? 680;
+    final cropped = img.copyCrop(decoded, x: cx, y: cy, width: cw, height: ch);
     final resized = img.copyResize(cropped, width: cropped.width * 2);
     return Uint8List.fromList(img.encodeJpg(resized, quality: 95));
   }
@@ -219,6 +226,19 @@ class _HomePageState extends State<HomePage> {
                 label: const Text('Выбрать видео'),
               ),
               const SizedBox(height: 20),
+              const SizedBox(height: 10),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CropCalibrator(frameBytes: _croppedBytes),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.crop),
+                label: const Text('Калибратор кропа'),
+              ),
               Text(_status, style: const TextStyle(fontSize: 16)),
               const SizedBox(height: 20),
               if (_croppedBytes != null)
