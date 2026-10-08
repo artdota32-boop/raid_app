@@ -109,7 +109,8 @@ class _HomePageState extends State<HomePage> {
   Uint8List? _cropBottomLeft(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
-    final cropped = img.copyCrop(decoded, x: 70, y: 360, width: 480 - 70, height: 760 - 360);
+    // ФИКС v3.5.9: расширен MAIN — захват +12 (было y:360)
+    final cropped = img.copyCrop(decoded, x: 40, y: 100, width: 500 - 40, height: 780 - 100);
     final resized = img.copyResize(cropped, width: cropped.width * 2);
     return Uint8List.fromList(img.encodeJpg(resized, quality: 95));
   }
