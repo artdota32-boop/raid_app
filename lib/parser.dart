@@ -6,9 +6,10 @@ class ArtifactParser {
   static const double yThreshold = 15.0;
   static const double xGapThreshold = 25.0;
   static const double xSplit = 130.0;
-  static const double yMaxForSet = 200.0;
-  static const double yMinForStats = 400.0;
-  static const double xMaxForSet = 400.0;
+  // ФИКС v3.5.9-3: фильтры под новый MAIN-кроп (y:100..780)
+  static const double yMaxForSet = 700.0;
+  static const double yMinForStats = 900.0;
+  static const double xMaxForSet = 700.0;
 
   static const Map<String, String> latinToCyrillic = {
     'M': 'М', 'e': 'е', 'E': 'Е', 'T': 'Т',
