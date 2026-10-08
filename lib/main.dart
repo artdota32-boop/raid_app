@@ -145,6 +145,10 @@ class _HomePageState extends State<HomePage> {
       _dprint('--- MAIN blocks: ${results.length} ---');
       for (int i = 0; i < results.length; i++) _debugPrintBlock('MAIN', i, results[i]);
       _dprint('########## OCR DEBUG END ##########');
+      _dprint('########## ICON DEBUG START ##########');
+      _dprint('--- ICON blocks: ${iconResults.length} ---');
+      for (int i = 0; i < iconResults.length; i++) _debugPrintBlock('ICON', i, iconResults[i]);
+      _dprint('########## ICON DEBUG END ##########');
 
       final parsed = ArtifactParser.parse(results, rightBlocks: rightResults, iconBlocks: iconResults);
 
