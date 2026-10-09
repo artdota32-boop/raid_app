@@ -33,6 +33,12 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+
+  @override
+  void initState() {
+    super.initState();
+    ArtifactParser.loadPrefs();
+  }
   File? _videoFile;
   Uint8List? _croppedBytes;
   String _status = 'Выбери видео';

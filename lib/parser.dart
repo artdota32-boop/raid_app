@@ -1,15 +1,25 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:ui' as ui;
 import 'package:paddle_ocr_native/paddle_ocr_native.dart' as pn;
 
 /// v3.4.0 — parser под paddle_ocr_native (PP-OCRv6)
 class ArtifactParser {
-  static const double yThreshold = 15.0;
-  static const double xGapThreshold = 25.0;
-  static const double xSplit = 250.0;
+  static double yThreshold = 15.0;
+  static double xGapThreshold = 25.0;
+  static double xSplit = 250.0;
   // ФИКС v3.5.9-3: фильтры под новый MAIN-кроп (y:100..780)
-  static const double yMaxForSet = 700.0;
-  static const double yMinForStats = 900.0;
-  static const double xMaxForSet = 700.0;
+  static double yMaxForSet = 700.0;
+  static double yMinForStats = 900.0;
+  static double xMaxForSet = 700.0;
+
+  static Future<void> loadPrefs() async {
+    final p = await SharedPreferences.getInstance();
+    xSplit = (p.getInt('xSplit') ?? 250).toDouble();
+    yThreshold = (p.getInt('yThreshold') ?? 15).toDouble();
+    yMaxForSet = (p.getInt('yMaxForSet') ?? 700).toDouble();
+    yMinForStats = (p.getInt('yMinForStats') ?? 900).toDouble();
+    xMaxForSet = (p.getInt('xMaxForSet') ?? 700).toDouble();
+  }
 
   static const Map<String, String> latinToCyrillic = {
     'M': 'М', 'e': 'е', 'E': 'Е', 'T': 'Т',

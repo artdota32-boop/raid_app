@@ -1,6 +1,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ReplScreen extends StatefulWidget {
@@ -24,7 +25,7 @@ class _ReplScreenState extends State<ReplScreen> {
     _controller.dispose();
     super.dispose();
   }
-  void _execute() {
+  Future<void> _execute() async {
     final cmd = _controller.text.trim();
     if (cmd.isEmpty) return;
     setState(() => _log.add('> $cmd'));
@@ -40,7 +41,8 @@ class _ReplScreenState extends State<ReplScreen> {
     if (action == 'set' && parts.length == 3) {
       final key = parts[1];
       final val = int.tryParse(parts[2]) ?? 0;
-      _prefs?.setInt(key, val);
+      await _prefs?.setInt(key, val);
+      await ArtifactParser.loadPrefs();
       setState(() => _log.add('OK: $key = $val'));
       return;
     }
