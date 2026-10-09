@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:snapframes/snapframes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'crop_calibrator.dart';
 import 'package:image/image.dart' as img;
 import 'package:paddle_ocr_native/paddle_ocr_native.dart' as pn;
 import 'parser.dart';
@@ -35,7 +34,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   File? _videoFile;
   Uint8List? _croppedBytes;
-  Uint8List? _originalFrameBytes;
   String _status = 'Выбери видео';
   String _ocrText = '';
   String _parsedText = '';
@@ -79,7 +77,6 @@ class _HomePageState extends State<HomePage> {
         setState(() => _status = 'Не удалось вырезать кадр');
         return;
       }
-      _originalFrameBytes = bytes;
       final cropped = await _cropBottomLeft(bytes);
       final rightPart = _cropRightPart(bytes);
       final iconPart = _cropIcon(bytes);
@@ -228,19 +225,6 @@ class _HomePageState extends State<HomePage> {
                 label: const Text('Выбрать видео'),
               ),
               const SizedBox(height: 20),
-              const SizedBox(height: 10),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => CropCalibrator(frameBytes: _originalFrameBytes),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.crop),
-                label: const Text('Калибратор кропа'),
-              ),
               Text(_status, style: const TextStyle(fontSize: 16)),
               const SizedBox(height: 20),
               if (_croppedBytes != null)
