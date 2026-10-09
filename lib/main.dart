@@ -33,7 +33,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-
   @override
   void initState() {
     super.initState();
@@ -41,6 +40,7 @@ class _HomePageState extends State<HomePage> {
   }
   File? _videoFile;
   Uint8List? _croppedBytes;
+  Uint8List? _lastFrame;
   String _status = 'Выбери видео';
   String _ocrText = '';
   String _parsedText = '';
@@ -84,6 +84,7 @@ class _HomePageState extends State<HomePage> {
         setState(() => _status = 'Не удалось вырезать кадр');
         return;
       }
+      _lastFrame = bytes;
       final cropped = await _cropBottomLeft(bytes);
       final rightPart = _cropRightPart(bytes);
       final iconPart = _cropIcon(bytes);
@@ -97,12 +98,35 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<String> parseCurrent() async {
+    if (_lastFrame == null) return 'ERR: нет кадра';
+    final cropped = await _cropBottomLeft(_lastFrame!);
+    if (cropped == null) return 'ERR: кроп не удался';
+    final rightPart = _cropRightPart(_lastFrame!);
+    final iconPart = _cropIcon(_lastFrame!);
+    final ocr = pn.PaddleOcr();
+    await ocr.init(
+      config: const pn.PaddleOcrConfig(),
+      engine: const pn.EngineConfig(numThreads: 4),
+    );
+    final croppedFile = await _saveBytesToFile(cropped, 'repl_main.jpg');
+    final rightFile = rightPart != null ? await _saveBytesToFile(rightPart, 'repl_right.jpg') : null;
+    final iconFile = iconPart != null ? await _saveBytesToFile(iconPart, 'repl_icon.jpg') : null;
+    final run = await ocr.recognize(croppedFile.path);
+    final rightRun = rightFile != null ? await ocr.recognize(rightFile.path) : null;
+    final iconRun = iconFile != null ? await ocr.recognize(iconFile.path) : null;
+    await ocr.dispose();
+    final results = run.results;
+    final rightResults = rightRun?.results ?? <pn.OcrResult>[];
+    final iconResults = iconRun?.results ?? <pn.OcrResult>[];
+    final parsed = ArtifactParser.parse(results, rightBlocks: rightResults, iconBlocks: iconResults);
+    return 'MAIN: ${parsed['stats']}\nDOP: ${parsed['dop_stats']}';
+  }
+
   Uint8List? _cropIcon(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
-    // ФИКС v3.5.9: область уровня +12 (было x:113 y:490)
     final cropped = img.copyCrop(decoded, x: 30, y: 140, width: 180 - 30, height: 210 - 140);
-    // ФИКС v3.5.9: увеличение ×3
     final resized = img.copyResize(cropped, width: cropped.width * 3);
     return Uint8List.fromList(img.encodeJpg(resized, quality: 95));
   }
@@ -117,13 +141,12 @@ class _HomePageState extends State<HomePage> {
   Future<Uint8List?> _cropBottomLeft(Uint8List bytes) async {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
-    // ФИКС v3.5.9: расширен MAIN — захват +12 (было y:360)
     final prefs = await SharedPreferences.getInstance();
-    final cx = prefs.getInt("crop_x") ?? 100;
-    final cy = prefs.getInt("crop_y") ?? 531;
-    final cw = prefs.getInt("crop_w") ?? 420;
-    final ch = prefs.getInt("crop_h") ?? 679;
-    final cropped = img.copyCrop(decoded, x: 40, y: 355, width: 470, height: 360);
+    final cx = prefs.getInt("crop_x") ?? 40;
+    final cy = prefs.getInt("crop_y") ?? 355;
+    final cw = prefs.getInt("crop_w") ?? 470;
+    final ch = prefs.getInt("crop_h") ?? 360;
+    final cropped = img.copyCrop(decoded, x: cx, y: cy, width: cw, height: ch);
     final resized = img.copyResize(cropped, width: cropped.width * 2);
     return Uint8List.fromList(img.encodeJpg(resized, quality: 95));
   }
@@ -143,21 +166,16 @@ class _HomePageState extends State<HomePage> {
         config: const pn.PaddleOcrConfig(),
         engine: const pn.EngineConfig(numThreads: 4),
       );
-
       final croppedFile = await _saveBytesToFile(cropped, 'main_crop.jpg');
       final rightFile = rightPart != null ? await _saveBytesToFile(rightPart, 'right_crop.jpg') : null;
       final iconFile = iconPart != null ? await _saveBytesToFile(iconPart, 'icon_crop.jpg') : null;
-
       final run = await ocr.recognize(croppedFile.path);
       final rightRun = rightFile != null ? await ocr.recognize(rightFile.path) : null;
       final iconRun = iconFile != null ? await ocr.recognize(iconFile.path) : null;
-
       await ocr.dispose();
-
       final results = run.results;
       final rightResults = rightRun?.results ?? <pn.OcrResult>[];
       final iconResults = iconRun?.results ?? <pn.OcrResult>[];
-
       _dprint('########## OCR DEBUG START ##########');
       _dprint('--- MAIN blocks: ${results.length} ---');
       for (int i = 0; i < results.length; i++) _debugPrintBlock('MAIN', i, results[i]);
@@ -166,18 +184,14 @@ class _HomePageState extends State<HomePage> {
       _dprint('--- ICON blocks: ${iconResults.length} ---');
       for (int i = 0; i < iconResults.length; i++) _debugPrintBlock('ICON', i, iconResults[i]);
       _dprint('########## ICON DEBUG END ##########');
-
       final parsed = ArtifactParser.parse(results, rightBlocks: rightResults, iconBlocks: iconResults);
-
       _dprint('########## PARSER DEBUG START ##########');
       final debugList = parsed['debug'] as List<String>?;
       if (debugList != null) {
         for (final d in debugList) _dprint(d);
       }
       _dprint('########## PARSER DEBUG END ##########');
-
       final text = results.map((r) => r.text).join("\n") + "\n" + rightResults.map((r) => r.text).join("\n");
-
       final parsedPretty = '''
 Сет: ${parsed['set'] ?? '?'}
 Тип: ${parsed['type'] ?? '?'}
@@ -190,7 +204,6 @@ class _HomePageState extends State<HomePage> {
 Бонус сета: ${parsed['set_bonus'] ?? '?'}
 Надето: ${parsed['worn'] ?? '?'}
 ''';
-
       setState(() {
         _ocrText = text;
         _parsedText = parsedPretty;
@@ -231,19 +244,19 @@ class _HomePageState extends State<HomePage> {
                 icon: const Icon(Icons.video_library),
                 label: const Text('Выбрать видео'),
               ),
-              const SizedBox(height: 20),
-              Text(_status, style: const TextStyle(fontSize: 16)),
               const SizedBox(height: 10),
               ElevatedButton.icon(
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const ReplScreen()),
+                    MaterialPageRoute(builder: (_) => ReplScreen(onParse: parseCurrent)),
                   );
                 },
                 icon: const Icon(Icons.terminal),
                 label: const Text('REPL'),
               ),
+              const SizedBox(height: 20),
+              Text(_status, style: const TextStyle(fontSize: 16)),
               const SizedBox(height: 20),
               if (_croppedBytes != null)
                 Padding(

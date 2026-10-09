@@ -1,11 +1,11 @@
-
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'parser.dart';
 
 class ReplScreen extends StatefulWidget {
-  const ReplScreen({super.key});
+  final Future<String> Function()? onParse;
+  const ReplScreen({super.key, this.onParse});
   @override
   State<ReplScreen> createState() => _ReplScreenState();
 }
@@ -14,17 +14,20 @@ class _ReplScreenState extends State<ReplScreen> {
   final _controller = TextEditingController();
   final List<String> _log = [];
   SharedPreferences? _prefs;
+
   @override
   void initState() {
     super.initState();
     SharedPreferences.getInstance().then((p) => _prefs = p);
     _log.add('REPL готов. Введи help.');
   }
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
+
   Future<void> _execute() async {
     final cmd = _controller.text.trim();
     if (cmd.isEmpty) return;
@@ -34,7 +37,28 @@ class _ReplScreenState extends State<ReplScreen> {
     final action = parts[0].toLowerCase();
 
     if (action == 'help') {
-      setState(() => _log.addAll(['help', 'set KEY VALUE', 'get KEY', 'reset']));
+      setState(() => _log.addAll([
+        'help',
+        'set KEY VALUE',
+        'get KEY',
+        'reset',
+        'parse',
+      ]));
+      return;
+    }
+
+    if (action == 'parse') {
+      if (widget.onParse == null) {
+        setState(() => _log.add('ERR: parse недоступен'));
+        return;
+      }
+      setState(() => _log.add('Парсинг запущен...'));
+      try {
+        final result = await widget.onParse!();
+        setState(() => _log.add(result));
+      } catch (e) {
+        setState(() => _log.add('ERR: $e'));
+      }
       return;
     }
 
@@ -56,6 +80,7 @@ class _ReplScreenState extends State<ReplScreen> {
 
     if (action == 'reset') {
       _prefs?.clear();
+      await ArtifactParser.loadPrefs();
       setState(() => _log.add('OK: все настройки сброшены'));
       return;
     }
