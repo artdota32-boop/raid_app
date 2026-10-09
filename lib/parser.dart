@@ -393,6 +393,8 @@ class ArtifactParser {
 
       if (cy > yMinForStats) continue;
 
+\n      // ФИКС v3.5.10: пропускаем описание сета (cy > 550)
+      if (cy > 550.0) continue;
       if (_isStatWithTwoNumbers(r.text)) {
         final nums = _extractAllNumbers(r);
         final statName = _findStatName(r, debugOut);
@@ -470,7 +472,7 @@ class ArtifactParser {
       final statName = _findStatName(r);
 
       // === ПРОВЕРКА: главный стат (DEF 143, ATK 143) — верхняя зона справа ===
-      final isMainStatZone = cy > 660.0 && cy < 745.0 && cx > 180.0 && cx < 500.0;
+      final isMainStatZone = cy > 160.0 && cy < 240.0 && cx > 180.0 && cx < 500.0;
       if (isMainStatZone && statName != null && _isStatWithNumber(r.text, debugOut)) {
         final val = _extractNumber(r, debugOut);
         if (val != null) {
