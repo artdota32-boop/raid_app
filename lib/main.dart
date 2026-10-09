@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image/image.dart' as img;
 import 'package:paddle_ocr_native/paddle_ocr_native.dart' as pn;
 import 'parser.dart';
+import 'repl_screen.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
@@ -226,6 +227,17 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 20),
               Text(_status, style: const TextStyle(fontSize: 16)),
+              const SizedBox(height: 10),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ReplScreen()),
+                  );
+                },
+                icon: const Icon(Icons.terminal),
+                label: const Text('REPL'),
+              ),
               const SizedBox(height: 20),
               if (_croppedBytes != null)
                 Padding(
