@@ -393,7 +393,7 @@ class ArtifactParser {
 
       if (cy > yMinForStats) continue;
 
-\n      // ФИКС v3.5.10: пропускаем описание сета (cy > 550)
+      // ФИКС v3.5.10: пропускаем описание сета (cy > 550)
       if (cy > 550.0) continue;
       if (_isStatWithTwoNumbers(r.text)) {
         final nums = _extractAllNumbers(r);
