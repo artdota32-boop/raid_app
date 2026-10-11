@@ -10,6 +10,11 @@ class ArtifactParser {
   // ФИКС v3.5.9-3: фильтры под новый MAIN-кроп (y:100..780)
   static double yMaxForSet = 700.0;
   static double yMinForStats = 900.0;
+  static double isMainStatY1 = 160.0;
+  static double isMainStatY2 = 240.0;
+  static double isMainStatX1 = 180.0;
+  static double isMainStatX2 = 600.0;
+  static double setDescCy = 550.0;
   static double xMaxForSet = 700.0;
 
   static Future<void> loadPrefs() async {
@@ -19,6 +24,11 @@ class ArtifactParser {
     yMaxForSet = (p.getInt('yMaxForSet') ?? 700).toDouble();
     yMinForStats = (p.getInt('yMinForStats') ?? 900).toDouble();
     xMaxForSet = (p.getInt('xMaxForSet') ?? 700).toDouble();
+    isMainStatY1 = (p.getInt('isMainStatY1') ?? 160).toDouble();
+    isMainStatY2 = (p.getInt('isMainStatY2') ?? 240).toDouble();
+    isMainStatX1 = (p.getInt('isMainStatX1') ?? 180).toDouble();
+    isMainStatX2 = (p.getInt('isMainStatX2') ?? 600).toDouble();
+    setDescCy = (p.getInt('setDescCy') ?? 550).toDouble();
   }
 
   static const Map<String, String> latinToCyrillic = {
@@ -404,7 +414,7 @@ class ArtifactParser {
       if (cy > yMinForStats) continue;
 
       // ФИКС v3.5.10: пропускаем описание сета (cy > 550)
-      if (cy > 550.0) continue;
+      if (cy > setDescCy) continue;
       if (_isStatWithTwoNumbers(r.text)) {
         final nums = _extractAllNumbers(r);
         final statName = _findStatName(r, debugOut);
@@ -482,7 +492,7 @@ class ArtifactParser {
       final statName = _findStatName(r);
 
       // === ПРОВЕРКА: главный стат (DEF 143, ATK 143) — верхняя зона справа ===
-      final isMainStatZone = cy > 160.0 && cy < 240.0 && cx > 180.0 && cx < 500.0;
+      final isMainStatZone = cy > isMainStatY1 && cy < isMainStatY2 && cx > isMainStatX1 && cx < isMainStatX2;
       if (isMainStatZone && statName != null && _isStatWithNumber(r.text, debugOut)) {
         final val = _extractNumber(r, debugOut);
         if (val != null) {

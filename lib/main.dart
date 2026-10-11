@@ -148,7 +148,8 @@ class _HomePageState extends State<HomePage> {
     final ch = prefs.getInt("crop_h") ?? 360;
     final cropped = img.copyCrop(decoded, x: cx, y: cy, width: cw, height: ch);
     debugPrint("[CROP] cx=$cx cy=$cy cw=$cw ch=$ch");
-    final resized = img.copyResize(cropped, width: cropped.width * 3);
+    final scale = prefs.getInt("crop_scale") ?? 3;
+    final resized = img.copyResize(cropped, width: cropped.width * scale);
     return Uint8List.fromList(img.encodeJpg(resized, quality: 95));
   }
 
