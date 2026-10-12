@@ -11,7 +11,7 @@ class ArtifactParser {
   static double yMaxForSet = 700.0;
   static double yMinForStats = 900.0;
   static double isMainStatY1 = 160.0;
-  static double isMainStatY2 = 240.0;
+  static double isMainStatY2 = 320.0;
   static double isMainStatX1 = 180.0;
   static double isMainStatX2 = 600.0;
   static double setDescCy = 550.0;
@@ -25,7 +25,7 @@ class ArtifactParser {
     yMinForStats = (p.getInt('yMinForStats') ?? 900).toDouble();
     xMaxForSet = (p.getInt('xMaxForSet') ?? 700).toDouble();
     isMainStatY1 = (p.getInt('isMainStatY1') ?? 160).toDouble();
-    isMainStatY2 = (p.getInt('isMainStatY2') ?? 240).toDouble();
+    isMainStatY2 = (p.getInt('isMainStatY2') ?? 320).toDouble();
     isMainStatX1 = (p.getInt('isMainStatX1') ?? 180).toDouble();
     isMainStatX2 = (p.getInt('isMainStatX2') ?? 600).toDouble();
     setDescCy = (p.getInt('setDescCy') ?? 550).toDouble();
