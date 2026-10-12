@@ -530,7 +530,7 @@ class ArtifactParser {
         continue;
       }
 
-      if (statName != null && cx < xSplit) {
+      if (statName != null && (cx < xSplit || statName == "C.RATE" || statName == "C.DMG")) {
         leftBlocks.add(r);
         continue;
       }
