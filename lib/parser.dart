@@ -28,7 +28,7 @@ class ArtifactParser {
     isMainStatY2 = (p.getInt('isMainStatY2') ?? 320).toDouble();
     isMainStatX1 = (p.getInt('isMainStatX1') ?? 180).toDouble();
     isMainStatX2 = (p.getInt('isMainStatX2') ?? 600).toDouble();
-    setDescCy = (p.getInt('setDescCy') ?? 550).toDouble();
+    setDescCy = (p.getInt('setDescCy') ?? 700).toDouble();
   }
 
   static const Map<String, String> latinToCyrillic = {
