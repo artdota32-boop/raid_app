@@ -156,13 +156,9 @@ class _HomePageState extends State<HomePage> {
 
   /// 🔥 Color-анализ звёзд → ранг (1-6★)
   int? _detectRank(Uint8List bytes) {
-    final decoded = img.decodeImage(bytes);
-    if (decoded == null) return null;
-    final iconX = _prefsCache?.getInt('icon_x') ?? 90;
-    final iconY = _prefsCache?.getInt('icon_y') ?? 388;
-    final iconW = _prefsCache?.getInt('icon_w') ?? 90;
-    final iconH = _prefsCache?.getInt('icon_h') ?? 35;
-    final cropped = img.copyCrop(decoded, x: iconX, y: iconY, width: iconW, height: iconH);
+    // 🔥 ФИКС: iconPart — уже кроп, не режем заново!
+    final cropped = img.decodeImage(bytes);
+    if (cropped == null) return null;
     
     // 🔥 Пороги из prefs
     final lumThreshold = _prefsCache?.getInt('rank_lum') ?? 40;
