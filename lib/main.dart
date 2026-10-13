@@ -33,10 +33,15 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  SharedPreferences? _prefsCache;
+
   @override
   void initState() {
     super.initState();
     ArtifactParser.loadPrefs();
+    SharedPreferences.getInstance().then((p) {
+      if (mounted) setState(() => _prefsCache = p);
+    });
   }
   File? _videoFile;
   Uint8List? _croppedBytes;
@@ -125,13 +130,6 @@ class _HomePageState extends State<HomePage> {
     return 'MAIN: ${parsed['stats']}\nDOP: ${parsed['dop_stats']}';
   }
 
-  Uint8List? _cropIcon(Uint8List bytes) {
-    final decoded = img.decodeImage(bytes);
-    if (decoded == null) return null;
-    final cropped = img.copyCrop(decoded, x: 30, y: 140, width: 180 - 30, height: 210 - 140);
-    final resized = img.copyResize(cropped, width: cropped.width * 3);
-    return Uint8List.fromList(img.encodeJpg(resized, quality: 95));
-  }
 
   Uint8List? _cropRightPart(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
