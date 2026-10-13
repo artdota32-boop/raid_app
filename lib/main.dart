@@ -181,7 +181,6 @@ class _HomePageState extends State<HomePage> {
         }
       }
     }
-    _dprint("[RANK] count=$count, rSum=$rSum, gSum=$gSum, bSum=$bSum");
     if (count < minCount) {
       _dprint("[RANK] ❌ count=$count < minCount=$minCount → null");
       return null;
@@ -190,6 +189,7 @@ class _HomePageState extends State<HomePage> {
     final avgG = gSum / count;
     final avgB = bSum / count;
     _dprint("[RANK] avg RGB = ($avgR, $avgG, $avgB), count=$count");
+    _dprint("[RANK] lumThreshold=$lumThreshold, minCount=$minCount");
     
     // Маппинг цвет → ранг
     // Оранжевый/жёлтый → 5★ (R>G>B)
