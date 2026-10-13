@@ -194,17 +194,17 @@ class _HomePageState extends State<HomePage> {
       }
       _dprint('########## PARSER DEBUG END ##########');
       final text = results.map((r) => r.text).join("\n") + "\n" + rightResults.map((r) => r.text).join("\n");
+      final rank = parsed['rank'] as int?;
+      final rankStars = rank != null ? ('★' * rank) : '?';
       final parsedPretty = '''
-Сет: ${parsed['set'] ?? '?'}
-Тип: ${parsed['type'] ?? '?'}
-Редкость: ${parsed['rarity'] ?? '?'}
-Уровень: ${parsed['level'] ?? '?'}
-Статы: ${parsed['stats']}
-Проценты: ${parsed['stats_percent'] ?? {}}
-Доп-статы: ${parsed['dop_stats'] ?? {}}
-Глифы: ${parsed['glyphs']}
-Бонус сета: ${parsed['set_bonus'] ?? '?'}
-Надето: ${parsed['worn'] ?? '?'}
+📦 ${parsed['set'] ?? '?'} (${parsed['type'] ?? '?'}) $rankStars
+📈 Уровень: +${parsed['level'] ?? '?'} | 🏆 ${parsed['rarity'] ?? '?'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💥 MAIN: ${parsed['stats']} | ${parsed['stats_percent'] ?? {}}
+📊 DOP: ${parsed['dop_stats'] ?? {}}
+✨ Глифы: ${parsed['glyphs'] ?? {}}
+📦 Бонус: ${parsed['set_bonus'] ?? '?'}
+👤 Надето: ${parsed['worn'] ?? '?'}
 ''';
       setState(() {
         _ocrText = text;

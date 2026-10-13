@@ -34,6 +34,7 @@
     {"id":"slayer","name_en":"Slayer","name_ru":"Убийца","pieces":9,"type":"Offense","bonuses":{"2":"+C. RATE","4":"+C. DMG","6":"+SPD","9":"+Turn Meter"}},
     {"id":"supersonic","name_en":"Supersonic","name_ru":"Сверхзвук","pieces":9,"type":"Speed","bonuses":{"2":"+HP","4":"+RES","6":"+SPD","9":"+Turn Meter"}},
     {"id":"stoneskin","name_en":"Stone Skin","name_ru":"Каменная кожа","pieces":9,"type":"Defense","bonuses":{"2":"+40 RES","3":"+8% HP","6":"+30% DEF","9":"Stone Skin shield for 2 turns"}},
-    {"id":"mercurial","name_en":"Mercurial","name_ru":"Переменчивость","pieces":9,"type":"Support","bonuses":{"2":"+RES","4":"+HP","6":"+SPD","9":"+Total Guard"}}
+    {"id":"mercurial","name_en":"Mercurial","name_ru":"Переменчивость","pieces":9,"type":"Support","bonuses":{"2":"+RES","4":"+HP","6":"+SPD","9":"+Total Guard"}},
+    {"id":"protection","name_en":"Protection","name_ru":"Защита","pieces":6,"type":"Support","bonuses":{"2":"+RES","4":"+HP","6":"+Protected 15% HP Shield"}}
   ]
 }

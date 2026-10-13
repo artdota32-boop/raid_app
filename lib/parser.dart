@@ -30,7 +30,12 @@ class ArtifactParser {
     final norm = text.toLowerCase().trim();
     final count = (setsDb['sets'] as List).length;
     setsLog.add('[SETS] Search "$norm" in $count sets');
-    for (final set in (setsDb['sets'] as List)) {
+    // 🔥 ФИКС: сортируем по длине name_en — длинные имена первыми
+    final sets = (setsDb['sets'] as List).toList();
+    sets.sort((a, b) => 
+      (b['name_en'] as String).length.compareTo((a['name_en'] as String).length)
+    );
+    for (final set in sets) {
       final nameEn = (set['name_en'] as String).toLowerCase();
       final nameRu = (set['name_ru'] as String).toLowerCase();
       final id = (set['id'] as String).toLowerCase();
@@ -647,6 +652,7 @@ class ArtifactParser {
       'type': null,
       'rarity': null,
       'level': null,
+      'rank': null,
       'stats': <String, List<int>>{},
       'stats_percent': <String, List<int>>{},
       'glyphs': <String, List<int>>{},
@@ -688,6 +694,13 @@ class ArtifactParser {
         if (lvl != null && [4, 8, 12, 16].contains(lvl)) {
           result['level'] = lvl;
         }
+      }
+
+      // 🔥 Ранг из prefs (ручной ввод)
+      final prefs = await SharedPreferences.getInstance();
+      final rankVal = prefs.getInt('rank') ?? 0;
+      if (rankVal >= 1 && rankVal <= 6) {
+        result['rank'] = rankVal;
       }
 
       final wornMatch = RegExp(r'Надето[:\s]*(\d+/\d+)').firstMatch(allText);
