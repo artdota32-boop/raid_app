@@ -128,7 +128,7 @@ class _HomePageState extends State<HomePage> {
     final iconResults = iconRun?.results ?? <pn.OcrResult>[];
     // 🔥 Авто-ранг через color-анализ
       final detectedRank = iconPart != null ? _detectRank(iconPart) : null;
-      debugPrint("[RANK] detected = \$detectedRank");
+      debugPrint("[RANK] detected = $detectedRank");
       final parsed = ArtifactParser.parse(results, rightBlocks: rightResults, iconBlocks: iconResults);
       if (detectedRank != null) parsed['rank'] = detectedRank;
     return 'MAIN: ${parsed['stats']}\nDOP: ${parsed['dop_stats']}';
@@ -150,7 +150,7 @@ class _HomePageState extends State<HomePage> {
     final iconW = _prefsCache?.getInt('icon_w') ?? 90;
     final iconH = _prefsCache?.getInt('icon_h') ?? 35;
     final cropped = img.copyCrop(decoded, x: iconX, y: iconY, width: iconW, height: iconH);
-    debugPrint("[ICON] x=\$iconX y=\$iconY w=\$iconW h=\$iconH");
+    debugPrint("[ICON] x=$iconX y=$iconY w=$iconW h=$iconH");
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
@@ -181,7 +181,7 @@ class _HomePageState extends State<HomePage> {
     final avgR = rSum / count;
     final avgG = gSum / count;
     final avgB = bSum / count;
-    debugPrint("[RANK] avg RGB = (\$avgR, \$avgG, \$avgB)");
+    debugPrint("[RANK] avg RGB = ($avgR, $avgG, $avgB)");
     
     // Маппинг цвет → ранг
     // Оранжевый/жёлтый → 5★ (R>G>B)
@@ -257,14 +257,32 @@ class _HomePageState extends State<HomePage> {
       _dprint('########## PARSER DEBUG END ##########');
       final text = results.map((r) => r.text).join("\n") + "\n" + rightResults.map((r) => r.text).join("\n");
       final rank = parsed['rank'] as int?;
-      final rankStars = rank != null ? ('★' * rank) : '?';
+      final rankStr = rank != null ? '$rank★' : '?★';
+      final mainStats = parsed['stats'] as Map<String, List<int>>? ?? {};
+      final mainPercent = parsed['stats_percent'] as Map<String, List<int>>? ?? {};
+      final dopStats = parsed['dop_stats'] as Map<String, List<int>>? ?? {};
+      final glyphs = parsed['glyphs'] as Map<String, List<int>>? ?? {};
+
+      final mainLines = <String>[];
+      mainPercent.forEach((k, v) => mainLines.add('   $k'.padRight(20) + '${v.first}%'));
+      mainStats.forEach((k, v) => mainLines.add('   $k'.padRight(20) + '${v.first}'));
+
+      final dopLines = <String>[];
+      dopStats.forEach((k, v) => dopLines.add('   $k'.padRight(20) + '${v.first}'));
+
+      final glyphLines = <String>[];
+      glyphs.forEach((k, v) => glyphLines.add('   $k'.padRight(20) + '+${v.first}'));
+
       final parsedPretty = '''
-📦 ${parsed['set'] ?? '?'} (${parsed['type'] ?? '?'}) $rankStars
-📈 Уровень: +${parsed['level'] ?? '?'} | 🏆 ${parsed['rarity'] ?? '?'}
+🎯 ${parsed['set'] ?? '?'} (${parsed['type'] ?? '?'})
+$rankStr ${parsed['rarity'] ?? '?'} | +${parsed['level'] ?? '?'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💥 MAIN: ${parsed['stats']} | ${parsed['stats_percent'] ?? {}}
-📊 DOP: ${parsed['dop_stats'] ?? {}}
-✨ Глифы: ${parsed['glyphs'] ?? {}}
+💥 MAIN:
+${mainLines.isEmpty ? '   —' : mainLines.join('\n')}
+📊 DOP:
+${dopLines.isEmpty ? '   —' : dopLines.join('\n')}
+✨ Глифы:
+${glyphLines.isEmpty ? '   —' : glyphLines.join('\n')}
 📦 Бонус: ${parsed['set_bonus'] ?? '?'}
 👤 Надето: ${parsed['worn'] ?? '?'}
 ''';
