@@ -172,11 +172,12 @@ class _HomePageState extends State<HomePage> {
         final r = p.r.toInt(), g = p.g.toInt(), b = p.b.toInt();
         final lum = (r + g + b) / 3;
         // Фильтр: только яркие пиксели (звёзды)
-        if (lum > 80) {
+        if (lum > 40) {
           rSum += r; gSum += g; bSum += b; count++;
         }
       }
     }
+    _dprint("[RANK] count=$count, rSum=$rSum, gSum=$gSum, bSum=$bSum");
     if (count < 10) return null;
     final avgR = rSum / count;
     final avgG = gSum / count;
