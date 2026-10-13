@@ -40,6 +40,7 @@ class _HomePageState extends State<HomePage> {
   }
   File? _videoFile;
   Uint8List? _croppedBytes;
+  Uint8List? _iconBytes;
   Uint8List? _lastFrame;
   String _status = 'Выбери видео';
   String _ocrText = '';
@@ -90,6 +91,7 @@ class _HomePageState extends State<HomePage> {
       final iconPart = _cropIcon(bytes);
       setState(() {
         _croppedBytes = cropped;
+        _iconBytes = iconPart;
         _status = 'Кадр обрезан! Запускаю OCR...';
       });
       await _runOcr(cropped, rightPart, iconPart);
@@ -135,6 +137,18 @@ class _HomePageState extends State<HomePage> {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
     final cropped = img.copyCrop(decoded, x: 252, y: 445, width: 380 - 252, height: 488 - 445);
+    return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
+  }
+
+  Uint8List? _cropIcon(Uint8List bytes) {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return null;
+    final iconX = _prefsCache?.getInt('icon_x') ?? 90;
+    final iconY = _prefsCache?.getInt('icon_y') ?? 200;
+    final iconW = _prefsCache?.getInt('icon_w') ?? 130;
+    final iconH = _prefsCache?.getInt('icon_h') ?? 130;
+    final cropped = img.copyCrop(decoded, x: iconX, y: iconY, width: iconW, height: iconH);
+    debugPrint("[ICON] x=\$iconX y=\$iconY w=\$iconW h=\$iconH");
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
   }
 
@@ -264,6 +278,17 @@ class _HomePageState extends State<HomePage> {
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Image.memory(_croppedBytes!, width: 200),
+                ),
+              if (_iconBytes != null)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      const Text('ICON CROP:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Image.memory(_iconBytes!, width: 150),
+                    ],
+                  ),
                 ),
               if (_parsedText.isNotEmpty)
                 Padding(
