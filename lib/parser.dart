@@ -1,9 +1,52 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:flutter/services.dart' show rootBundle;
 import 'dart:ui' as ui;
 import 'package:paddle_ocr_native/paddle_ocr_native.dart' as pn;
 
 /// v3.4.0 — parser под paddle_ocr_native (PP-OCRv6)
 class ArtifactParser {
+  // 🔥 БАЗА СЕТОВ (оптимизатор + UI)
+  static Map<String, dynamic> setsDb = {'sets': []};
+  static bool _setsDbLoaded = false;
+
+  /// Загрузка базы сетов из assets/sets.json
+  static Future<void> loadSetsDb() async {
+    if (_setsDbLoaded) return;
+    try {
+      final jsonStr = await rootBundle.loadString('assets/sets.json');
+      setsDb = json.decode(jsonStr);
+      _setsDbLoaded = true;
+    } catch (e) {
+      setsDb = {'sets': []};
+    }
+  }
+
+  /// Поиск сета по имени в тексте
+  static Map<String, dynamic>? _findSetByName(String text) {
+    final norm = text.toLowerCase().trim();
+    for (final set in (setsDb['sets'] as List)) {
+      final nameEn = (set['name_en'] as String).toLowerCase();
+      final nameRu = (set['name_ru'] as String).toLowerCase();
+      final id = (set['id'] as String).toLowerCase();
+      if (norm.contains(nameEn) || norm.contains(nameRu) || norm.contains(id)) {
+        return set as Map<String, dynamic>;
+      }
+    }
+    return null;
+  }
+
+  /// Форматирование бонусов сета
+  static String _formatSetBonuses(Map<String, dynamic> set) {
+    final bonuses = set['bonuses'] as Map<String, dynamic>;
+    final parts = <String>[];
+    final keys = bonuses.keys.toList()..sort((a, b) => int.parse(a).compareTo(int.parse(b)));
+    for (final k in keys) {
+      parts.add('${k}pc ${bonuses[k]}');
+    }
+    return parts.join(', ');
+  }
+
   static double yThreshold = 15.0;
   static double xGapThreshold = 25.0;
   static double xSplit = 250.0;
@@ -29,6 +72,7 @@ class ArtifactParser {
     isMainStatX1 = (p.getInt('isMainStatX1') ?? 180).toDouble();
     isMainStatX2 = (p.getInt('isMainStatX2') ?? 600).toDouble();
     setDescCy = (p.getInt('setDescCy') ?? 700).toDouble();
+     await loadSetsDb();
   }
 
   static const Map<String, String> latinToCyrillic = {
@@ -647,13 +691,13 @@ class ArtifactParser {
         if (wornEn != null) result['worn'] = wornEn.group(1);
       }
 
-      final bonusRu = RegExp(r'Комплект[:\s]*(\d+)\s*шт').firstMatch(allText);
-      if (bonusRu != null) {
-        result['set_bonus'] = '${bonusRu.group(1)} шт.';
-      } else {
-        final bonusEn = RegExp(r'New Bonus for every (\w+)').firstMatch(allText);
-        if (bonusEn != null) {
-          result['set_bonus'] = bonusEn.group(1);
+      // 🔥 ФИКС: бонус через базу сетов
+      final setName = result['set'] as String?;
+      if (setName != null) {
+        final setInfo = _findSetByName(setName);
+        if (setInfo != null) {
+          result['set_bonus'] = _formatSetBonuses(setInfo);
+          result['set_id'] = setInfo['id'];
         } else {
           final bonusPieces = RegExp(r'(\d+)\s+Artifacts per Set').firstMatch(allText);
           if (bonusPieces != null) {

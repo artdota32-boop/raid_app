@@ -22,3 +22,4 @@ flutter:
     - assets/models/det.onnx
     - assets/models/rec.onnx
     - assets/models/dict.txt
+    - assets/sets.json
