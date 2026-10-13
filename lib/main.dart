@@ -128,7 +128,7 @@ class _HomePageState extends State<HomePage> {
     final iconResults = iconRun?.results ?? <pn.OcrResult>[];
     // 🔥 Авто-ранг через color-анализ
       final detectedRank = iconPart != null ? _detectRank(iconPart) : null;
-      debugPrint("[RANK] detected = $detectedRank");
+      _dprint("[RANK] detected = $detectedRank");
       final parsed = ArtifactParser.parse(results, rightBlocks: rightResults, iconBlocks: iconResults);
       if (detectedRank != null) parsed['rank'] = detectedRank;
     return 'MAIN: ${parsed['stats']}\nDOP: ${parsed['dop_stats']}';
@@ -172,7 +172,7 @@ class _HomePageState extends State<HomePage> {
         final r = p.r.toInt(), g = p.g.toInt(), b = p.b.toInt();
         final lum = (r + g + b) / 3;
         // Фильтр: только яркие пиксели (звёзды)
-        if (lum > 120) {
+        if (lum > 80) {
           rSum += r; gSum += g; bSum += b; count++;
         }
       }
@@ -181,7 +181,7 @@ class _HomePageState extends State<HomePage> {
     final avgR = rSum / count;
     final avgG = gSum / count;
     final avgB = bSum / count;
-    debugPrint("[RANK] avg RGB = ($avgR, $avgG, $avgB)");
+    _dprint("[RANK] avg RGB = ($avgR, $avgG, $avgB), count=$count");
     
     // Маппинг цвет → ранг
     // Оранжевый/жёлтый → 5★ (R>G>B)
