@@ -164,6 +164,10 @@ class _HomePageState extends State<HomePage> {
     final iconH = _prefsCache?.getInt('icon_h') ?? 35;
     final cropped = img.copyCrop(decoded, x: iconX, y: iconY, width: iconW, height: iconH);
     
+    // 🔥 Пороги из prefs
+    final lumThreshold = _prefsCache?.getInt('rank_lum') ?? 40;
+    final minCount = _prefsCache?.getInt('rank_min_count') ?? 10;
+
     // Считаем средний цвет только ярких пикселей (звёзды)
     int rSum = 0, gSum = 0, bSum = 0, count = 0;
     for (int y = 0; y < cropped.height; y++) {
@@ -172,13 +176,16 @@ class _HomePageState extends State<HomePage> {
         final r = p.r.toInt(), g = p.g.toInt(), b = p.b.toInt();
         final lum = (r + g + b) / 3;
         // Фильтр: только яркие пиксели (звёзды)
-        if (lum > 40) {
+        if (lum > lumThreshold) {
           rSum += r; gSum += g; bSum += b; count++;
         }
       }
     }
     _dprint("[RANK] count=$count, rSum=$rSum, gSum=$gSum, bSum=$bSum");
-    if (count < 10) return null;
+    if (count < minCount) {
+      _dprint("[RANK] ❌ count=$count < minCount=$minCount → null");
+      return null;
+    }
     final avgR = rSum / count;
     final avgG = gSum / count;
     final avgB = bSum / count;
@@ -192,13 +199,31 @@ class _HomePageState extends State<HomePage> {
     // Синий → 3★ (B>R,G)
     // Фиолетовый → 4★ (R и B > G)
     
-    if (avgR > 200 && avgG < 100 && avgB < 100) return 6; // Красный
-    if (avgR > 200 && avgG > 130 && avgB < 100) return 5; // Оранжевый
-    if (avgR > 150 && avgB > 150 && avgG < 100) return 4; // Фиолетовый
+    // 🔥 Пороги RGB из prefs
+    final r6 = _prefsCache?.getInt('rank_red_r') ?? 200;
+    final g6 = _prefsCache?.getInt('rank_red_g') ?? 100;
+    final b6 = _prefsCache?.getInt('rank_red_b') ?? 100;
+
+    final r5 = _prefsCache?.getInt('rank_orange_r') ?? 200;
+    final g5 = _prefsCache?.getInt('rank_orange_g') ?? 130;
+    final b5 = _prefsCache?.getInt('rank_orange_b') ?? 100;
+
+    final r4 = _prefsCache?.getInt('rank_purple_r') ?? 150;
+    final g4 = _prefsCache?.getInt('rank_purple_g') ?? 100;
+    final b4 = _prefsCache?.getInt('rank_purple_b') ?? 150;
+
+    final r1 = _prefsCache?.getInt('rank_gray_r') ?? 180;
+    final g1 = _prefsCache?.getInt('rank_gray_g') ?? 180;
+    final b1 = _prefsCache?.getInt('rank_gray_b') ?? 180;
+
+    if (avgR > r6 && avgG < g6 && avgB < b6) return 6; // Красный
+    if (avgR > r5 && avgG > g5 && avgB < b5) return 5; // Оранжевый
+    if (avgR > r4 && avgB > b4 && avgG < g4) return 4; // Фиолетовый
     if (avgB > avgR && avgB > avgG) return 3; // Синий
     if (avgG > avgR && avgG > avgB) return 2; // Зелёный
-    if (avgR > 180 && avgG > 180 && avgB > 180) return 1; // Серый
-    return 5; // По умолчанию 5★ (самый частый)
+    if (avgR > r1 && avgG > g1 && avgB > b1) return 1; // Серый
+    _dprint("[RANK] ⚠️ Не попал в пороги → default 5");
+    return 5;
   }
 
   Future<Uint8List?> _cropBottomLeft(Uint8List bytes) async {
