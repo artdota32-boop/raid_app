@@ -698,21 +698,6 @@ class ArtifactParser {
         if (wornEn != null) result['worn'] = wornEn.group(1);
       }
 
-      // 🔥 ФИКС: бонус через базу сетов
-      final setName = result['set'] as String?;
-      if (setName != null) {
-        final setInfo = _findSetByName(setName);
-        if (setInfo != null) {
-          result['set_bonus'] = _formatSetBonuses(setInfo);
-          result['set_id'] = setInfo['id'];
-        } else {
-          final bonusPieces = RegExp(r'(\d+)\s+Artifacts per Set').firstMatch(allText);
-          if (bonusPieces != null) {
-            result['set_bonus'] = '${bonusPieces.group(1)} pcs';
-          }
-        }
-      }
-
       pn.OcrResult? topBlock;
       double minY = double.infinity;
       for (final r in mainBlocks) {
@@ -738,6 +723,21 @@ class ArtifactParser {
           RegExp(r'^\s*(Set|Сет)\s*[:\.]?\s*', caseSensitive: false), '');
         setName = setName.trim();
         result['set'] = setName.isEmpty ? null : setName;
+      }
+
+      // 🔥 ФИКС: бонус через базу сетов (ПОСЛЕ заполнения result['set'])
+      final setName2 = result['set'] as String?;
+      if (setName2 != null) {
+        final setInfo = _findSetByName(setName2);
+        if (setInfo != null) {
+          result['set_bonus'] = _formatSetBonuses(setInfo);
+          result['set_id'] = setInfo['id'];
+        } else {
+          final bonusPieces = RegExp(r'(\d+)\s+Artifacts per Set').firstMatch(allText);
+          if (bonusPieces != null) {
+            result['set_bonus'] = '${bonusPieces.group(1)} pcs';
+          }
+        }
       }
 
       debug.addAll(setsLog);
