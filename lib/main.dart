@@ -142,10 +142,10 @@ class _HomePageState extends State<HomePage> {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
     final prefs = await SharedPreferences.getInstance();
-    final cx = prefs.getInt("crop_x") ?? 40;
-    final cy = prefs.getInt("crop_y") ?? 355;
+    final cx = prefs.getInt("crop_x") ?? 50;
+    final cy = prefs.getInt("crop_y") ?? 352;
     final cw = prefs.getInt("crop_w") ?? 470;
-    final ch = prefs.getInt("crop_h") ?? 360;
+    final ch = prefs.getInt("crop_h") ?? 358;
     final cropped = img.copyCrop(decoded, x: cx, y: cy, width: cw, height: ch);
     debugPrint("[CROP] cx=$cx cy=$cy cw=$cw ch=$ch");
     final scale = prefs.getInt("crop_scale") ?? 3;
