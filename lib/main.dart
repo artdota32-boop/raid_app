@@ -248,7 +248,11 @@ class _HomePageState extends State<HomePage> {
       _dprint('--- ICON blocks: ${iconResults.length} ---');
       for (int i = 0; i < iconResults.length; i++) _debugPrintBlock('ICON', i, iconResults[i]);
       _dprint('########## ICON DEBUG END ##########');
+      // 🔥 Авто-ранг через color-анализ
+      final detectedRank = iconPart != null ? _detectRank(iconPart) : null;
+      _dprint("[RANK] detected = $detectedRank");
       final parsed = ArtifactParser.parse(results, rightBlocks: rightResults, iconBlocks: iconResults);
+      if (detectedRank != null) parsed['rank'] = detectedRank;
       _dprint('########## PARSER DEBUG START ##########');
       final debugList = parsed['debug'] as List<String>?;
       if (debugList != null) {
