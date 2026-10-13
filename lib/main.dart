@@ -126,7 +126,11 @@ class _HomePageState extends State<HomePage> {
     final results = run.results;
     final rightResults = rightRun?.results ?? <pn.OcrResult>[];
     final iconResults = iconRun?.results ?? <pn.OcrResult>[];
-    final parsed = ArtifactParser.parse(results, rightBlocks: rightResults, iconBlocks: iconResults);
+    // 🔥 Авто-ранг через color-анализ
+      final detectedRank = iconPart != null ? _detectRank(iconPart) : null;
+      debugPrint("[RANK] detected = \$detectedRank");
+      final parsed = ArtifactParser.parse(results, rightBlocks: rightResults, iconBlocks: iconResults);
+      if (detectedRank != null) parsed['rank'] = detectedRank;
     return 'MAIN: ${parsed['stats']}\nDOP: ${parsed['dop_stats']}';
   }
 
@@ -148,6 +152,52 @@ class _HomePageState extends State<HomePage> {
     final cropped = img.copyCrop(decoded, x: iconX, y: iconY, width: iconW, height: iconH);
     debugPrint("[ICON] x=\$iconX y=\$iconY w=\$iconW h=\$iconH");
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
+  }
+
+  /// 🔥 Color-анализ звёзд → ранг (1-6★)
+  int? _detectRank(Uint8List bytes) {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return null;
+    final iconX = _prefsCache?.getInt('icon_x') ?? 90;
+    final iconY = _prefsCache?.getInt('icon_y') ?? 388;
+    final iconW = _prefsCache?.getInt('icon_w') ?? 90;
+    final iconH = _prefsCache?.getInt('icon_h') ?? 35;
+    final cropped = img.copyCrop(decoded, x: iconX, y: iconY, width: iconW, height: iconH);
+    
+    // Считаем средний цвет только ярких пикселей (звёзды)
+    int rSum = 0, gSum = 0, bSum = 0, count = 0;
+    for (int y = 0; y < cropped.height; y++) {
+      for (int x = 0; x < cropped.width; x++) {
+        final p = cropped.getPixel(x, y);
+        final r = p.r.toInt(), g = p.g.toInt(), b = p.b.toInt();
+        final lum = (r + g + b) / 3;
+        // Фильтр: только яркие пиксели (звёзды)
+        if (lum > 120) {
+          rSum += r; gSum += g; bSum += b; count++;
+        }
+      }
+    }
+    if (count < 10) return null;
+    final avgR = rSum / count;
+    final avgG = gSum / count;
+    final avgB = bSum / count;
+    debugPrint("[RANK] avg RGB = (\$avgR, \$avgG, \$avgB)");
+    
+    // Маппинг цвет → ранг
+    // Оранжевый/жёлтый → 5★ (R>G>B)
+    // Красный → 6★ (R>>G,B)
+    // Серый → 1★
+    // Зелёный → 2★ (G>R,B)
+    // Синий → 3★ (B>R,G)
+    // Фиолетовый → 4★ (R и B > G)
+    
+    if (avgR > 200 && avgG < 100 && avgB < 100) return 6; // Красный
+    if (avgR > 200 && avgG > 130 && avgB < 100) return 5; // Оранжевый
+    if (avgR > 150 && avgB > 150 && avgG < 100) return 4; // Фиолетовый
+    if (avgB > avgR && avgB > avgG) return 3; // Синий
+    if (avgG > avgR && avgG > avgB) return 2; // Зелёный
+    if (avgR > 180 && avgG > 180 && avgB > 180) return 1; // Серый
+    return 5; // По умолчанию 5★ (самый частый)
   }
 
   Future<Uint8List?> _cropBottomLeft(Uint8List bytes) async {
