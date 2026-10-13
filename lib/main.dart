@@ -142,9 +142,9 @@ class _HomePageState extends State<HomePage> {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
     final iconX = _prefsCache?.getInt('icon_x') ?? 90;
-    final iconY = _prefsCache?.getInt('icon_y') ?? 200;
-    final iconW = _prefsCache?.getInt('icon_w') ?? 130;
-    final iconH = _prefsCache?.getInt('icon_h') ?? 130;
+    final iconY = _prefsCache?.getInt('icon_y') ?? 388;
+    final iconW = _prefsCache?.getInt('icon_w') ?? 90;
+    final iconH = _prefsCache?.getInt('icon_h') ?? 35;
     final cropped = img.copyCrop(decoded, x: iconX, y: iconY, width: iconW, height: iconH);
     debugPrint("[ICON] x=\$iconX y=\$iconY w=\$iconW h=\$iconH");
     return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
