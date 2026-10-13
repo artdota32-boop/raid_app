@@ -10,6 +10,7 @@ class ArtifactParser {
   static Map<String, dynamic> setsDb = {'sets': []};
   static bool _setsDbLoaded = false;
   static List<String> setsLog = [];
+  static int currentRank = 0;
 
   /// Загрузка базы сетов из assets/sets.json
   static Future<void> loadSetsDb() async {
@@ -84,6 +85,7 @@ class ArtifactParser {
     isMainStatX1 = (p.getInt('isMainStatX1') ?? 180).toDouble();
     isMainStatX2 = (p.getInt('isMainStatX2') ?? 600).toDouble();
     setDescCy = (p.getInt('setDescCy') ?? 700).toDouble();
+    currentRank = p.getInt('rank') ?? 0;
      await loadSetsDb();
   }
 
@@ -696,11 +698,9 @@ class ArtifactParser {
         }
       }
 
-      // 🔥 Ранг из prefs (ручной ввод)
-      final prefs = await SharedPreferences.getInstance();
-      final rankVal = prefs.getInt('rank') ?? 0;
-      if (rankVal >= 1 && rankVal <= 6) {
-        result['rank'] = rankVal;
+      // 🔥 Ранг из prefs (через currentRank)
+      if (currentRank >= 1 && currentRank <= 6) {
+        result['rank'] = currentRank;
       }
 
       final wornMatch = RegExp(r'Надето[:\s]*(\d+/\d+)').firstMatch(allText);
