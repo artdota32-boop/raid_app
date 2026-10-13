@@ -17,22 +17,28 @@ class ArtifactParser {
       final jsonStr = await rootBundle.loadString('assets/sets.json');
       setsDb = json.decode(jsonStr);
       _setsDbLoaded = true;
+      print('[SETS] ✅ Loaded ${(setsDb['sets'] as List).length} sets');
     } catch (e) {
       setsDb = {'sets': []};
+      print('[SETS] ❌ Failed: $e');
     }
   }
 
   /// Поиск сета по имени в тексте
   static Map<String, dynamic>? _findSetByName(String text) {
     final norm = text.toLowerCase().trim();
+    final count = (setsDb['sets'] as List).length;
+    print('[SETS] Search "$norm" in $count sets');
     for (final set in (setsDb['sets'] as List)) {
       final nameEn = (set['name_en'] as String).toLowerCase();
       final nameRu = (set['name_ru'] as String).toLowerCase();
       final id = (set['id'] as String).toLowerCase();
       if (norm.contains(nameEn) || norm.contains(nameRu) || norm.contains(id)) {
+        print('[SETS] ✅ Found: $id');
         return set as Map<String, dynamic>;
       }
     }
+    print('[SETS] ❌ Not found');
     return null;
   }
 
