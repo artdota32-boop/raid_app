@@ -220,7 +220,7 @@ class _HomePageState extends State<HomePage> {
     if (avgR > r1 && avgG > g1 && avgB > b1) return 1; // Серый
     _dprint("[RANK] ⚠️ Не попал в пороги → default 5");
 
-    // 🔥 ГИБРИД: если color=5 → считаем звёзды (5 vs 6)
+    // 🔥 ГИБРИД: color=5 → считаем звёзды (5 vs 6)
     _dprint("[RANK] → проверяем звёзды (5 vs 6)");
     final starCount = _countStars(bytes);
     if (starCount != null && starCount >= 6) {
@@ -230,27 +230,23 @@ class _HomePageState extends State<HomePage> {
     return 5;
   }
 
-  /// 🔥 Счёт звёзд на ICON CROP (5 vs 6)
+  /// 🔥 Счёт звёзд (5 vs 6) — гибридная логика
   int? _countStars(Uint8List bytes) {
-    final img = img.decodeImage(bytes);
-    if (img == null) return null;
-
+    final img2 = img.decodeImage(bytes);
+    if (img2 == null) return null;
     final lumThreshold = _prefsCache?.getInt('star_lum') ?? 150;
-
-    // Сканируем 3 линии: 1/3, 1/2, 2/3 высоты
     final lines = [
-      img.height ~/ 3,
-      img.height ~/ 2,
-      img.height * 2 ~/ 3,
+      img2.height ~/ 3,
+      img2.height ~/ 2,
+      img2.height * 2 ~/ 3,
     ];
-
     int maxStars = 0;
     for (final y in lines) {
-      if (y < 0 || y >= img.height) continue;
+      if (y < 0 || y >= img2.height) continue;
       int count = 0;
       bool inStar = false;
-      for (int x = 0; x < img.width; x++) {
-        final p = img.getPixel(x, y);
+      for (int x = 0; x < img2.width; x++) {
+        final p = img2.getPixel(x, y);
         final lum = (p.r + p.g + p.b) / 3;
         final isBright = lum > lumThreshold;
         if (isBright && !inStar) {
@@ -262,9 +258,8 @@ class _HomePageState extends State<HomePage> {
       }
       if (count > maxStars) maxStars = count;
     }
-    _dprint("[STARS] count=$maxStars (threshold=$lumThreshold)");
+    _dprint("[STARS] count=$maxStars (lum=$lumThreshold)");
     return maxStars;
-  }
   }
 
   Future<Uint8List?> _cropBottomLeft(Uint8List bytes) async {
