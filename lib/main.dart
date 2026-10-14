@@ -34,19 +34,13 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   SharedPreferences? _prefsCache;
-  int _currentRankOverride = 0;
 
   @override
   void initState() {
     super.initState();
     ArtifactParser.loadPrefs();
     SharedPreferences.getInstance().then((p) {
-      if (mounted) {
-        setState(() {
-          _prefsCache = p;
-          _currentRankOverride = p.getInt('rank') ?? 0;
-        });
-      }
+      if (mounted) setState(() => _prefsCache = p);
     });
   }
   File? _videoFile;
@@ -136,15 +130,13 @@ class _HomePageState extends State<HomePage> {
       final detectedRank = iconPart != null ? _detectRank(iconPart) : null;
       _dprint("[RANK] detected = $detectedRank");
 
-      // 🔥 OVERRIDE через prefs (читаем напрямую)
       final prefsNow = await SharedPreferences.getInstance();
       final overrideRank = prefsNow.getInt('rank') ?? 0;
       final finalRank = (overrideRank >= 1 && overrideRank <= 6) ? overrideRank : detectedRank;
       _dprint("[RANK] overrideRank=$overrideRank, detected=$detectedRank, final=$finalRank");
       if (overrideRank >= 1 && overrideRank <= 6) {
-        _dprint("[RANK] 🔥 OVERRIDE ACTIVE: rank=$overrideRank");
+        _dprint("[RANK] OVERRIDE ACTIVE: rank=$overrideRank");
       }
-
       final parsed = ArtifactParser.parse(results, rightBlocks: rightResults, iconBlocks: iconResults);
       if (finalRank != null) parsed['rank'] = finalRank;
     return 'MAIN: ${parsed['stats']}\nDOP: ${parsed['dop_stats']}';
@@ -230,7 +222,7 @@ class _HomePageState extends State<HomePage> {
 
     if (avgR > r6 && avgG < g6 && avgB < b6) return 6; // Красный
     if (avgR > r5 && avgG > g5 && avgB < b5) return 5; // Оранжевый
-    if (avgR > r4 && avgB > b4 && avgG < g4 + 40) return 4; // Фиолетовый (мягче)
+    if (avgR > r4 && avgB > b4 && avgG < g4) return 4; // Фиолетовый
     if (avgB > avgR && avgB > avgG) return 3; // Синий
     if (avgG > avgR && avgG > avgB) return 2; // Зелёный
     if (avgR > r1 && avgG > g1 && avgB > b1) return 1; // Серый
@@ -286,11 +278,11 @@ class _HomePageState extends State<HomePage> {
         if (isBright) {
           runLength++;
         } else {
-          if (runLength >= 8) count++;
+          if (runLength >= 5) count++;
           runLength = 0;
         }
       }
-      if (runLength >= 8) count++;
+      if (runLength >= 5) count++;
       if (count > maxStars) maxStars = count;
     }
     _dprint("[STARS] count=$maxStars (avgLum=$avgLum, threshold=$lumThreshold, offset=$offset)");
@@ -372,12 +364,7 @@ class _HomePageState extends State<HomePage> {
       dopStats.forEach((k, v) => dopLines.add('   $k'.padRight(20) + '${v.first}'));
 
       final glyphLines = <String>[];
-      const percentStats = ['HP', 'ATK', 'DEF', 'C.RATE', 'C.DMG', 'C.RAT', 'CRATE', 'CDMG'];
-      glyphs.forEach((k, v) {
-        final isPercent = percentStats.contains(k.toUpperCase());
-        final suffix = isPercent ? '%' : '';
-        glyphLines.add('   $k'.padRight(20) + '+${v.first}$suffix');
-      });
+      glyphs.forEach((k, v) => glyphLines.add('   $k'.padRight(20) + '+${v.first}'));
 
       final parsedPretty = '''
 🎯 ${parsed['set'] ?? '?'} (${parsed['type'] ?? '?'})
