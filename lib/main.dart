@@ -136,11 +136,13 @@ class _HomePageState extends State<HomePage> {
       final detectedRank = iconPart != null ? _detectRank(iconPart) : null;
       _dprint("[RANK] detected = $detectedRank");
 
-      // 🔥 OVERRIDE через prefs
-      final overrideRank = _prefsCache?.getInt('rank') ?? 0;
+      // 🔥 OVERRIDE через prefs (читаем напрямую)
+      final prefsNow = await SharedPreferences.getInstance();
+      final overrideRank = prefsNow.getInt('rank') ?? 0;
       final finalRank = (overrideRank >= 1 && overrideRank <= 6) ? overrideRank : detectedRank;
+      _dprint("[RANK] overrideRank=$overrideRank, detected=$detectedRank, final=$finalRank");
       if (overrideRank >= 1 && overrideRank <= 6) {
-        _dprint("[RANK] 🔥 OVERRIDE active: rank=$overrideRank");
+        _dprint("[RANK] 🔥 OVERRIDE ACTIVE: rank=$overrideRank");
       }
 
       final parsed = ArtifactParser.parse(results, rightBlocks: rightResults, iconBlocks: iconResults);
