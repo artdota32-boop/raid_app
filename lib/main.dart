@@ -34,13 +34,19 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   SharedPreferences? _prefsCache;
+  int _currentRankOverride = 0;
 
   @override
   void initState() {
     super.initState();
     ArtifactParser.loadPrefs();
     SharedPreferences.getInstance().then((p) {
-      if (mounted) setState(() => _prefsCache = p);
+      if (mounted) {
+        setState(() {
+          _prefsCache = p;
+          _currentRankOverride = p.getInt('rank') ?? 0;
+        });
+      }
     });
   }
   File? _videoFile;
@@ -129,8 +135,16 @@ class _HomePageState extends State<HomePage> {
     // 🔥 Авто-ранг через color-анализ
       final detectedRank = iconPart != null ? _detectRank(iconPart) : null;
       _dprint("[RANK] detected = $detectedRank");
+
+      // 🔥 OVERRIDE через prefs
+      final overrideRank = _prefsCache?.getInt('rank') ?? 0;
+      final finalRank = (overrideRank >= 1 && overrideRank <= 6) ? overrideRank : detectedRank;
+      if (overrideRank >= 1 && overrideRank <= 6) {
+        _dprint("[RANK] 🔥 OVERRIDE active: rank=$overrideRank");
+      }
+
       final parsed = ArtifactParser.parse(results, rightBlocks: rightResults, iconBlocks: iconResults);
-      if (detectedRank != null) parsed['rank'] = detectedRank;
+      if (finalRank != null) parsed['rank'] = finalRank;
     return 'MAIN: ${parsed['stats']}\nDOP: ${parsed['dop_stats']}';
   }
 
@@ -214,7 +228,7 @@ class _HomePageState extends State<HomePage> {
 
     if (avgR > r6 && avgG < g6 && avgB < b6) return 6; // Красный
     if (avgR > r5 && avgG > g5 && avgB < b5) return 5; // Оранжевый
-    if (avgR > r4 && avgB > b4 && avgG < g4) return 4; // Фиолетовый
+    if (avgR > r4 && avgB > b4 && avgG < g4 + 40) return 4; // Фиолетовый (мягче)
     if (avgB > avgR && avgB > avgG) return 3; // Синий
     if (avgG > avgR && avgG > avgB) return 2; // Зелёный
     if (avgR > r1 && avgG > g1 && avgB > b1) return 1; // Серый
@@ -270,11 +284,11 @@ class _HomePageState extends State<HomePage> {
         if (isBright) {
           runLength++;
         } else {
-          if (runLength >= 5) count++;
+          if (runLength >= 8) count++;
           runLength = 0;
         }
       }
-      if (runLength >= 5) count++;
+      if (runLength >= 8) count++;
       if (count > maxStars) maxStars = count;
     }
     _dprint("[STARS] count=$maxStars (avgLum=$avgLum, threshold=$lumThreshold, offset=$offset)");
@@ -356,7 +370,12 @@ class _HomePageState extends State<HomePage> {
       dopStats.forEach((k, v) => dopLines.add('   $k'.padRight(20) + '${v.first}'));
 
       final glyphLines = <String>[];
-      glyphs.forEach((k, v) => glyphLines.add('   $k'.padRight(20) + '+${v.first}'));
+      const percentStats = ['HP', 'ATK', 'DEF', 'C.RATE', 'C.DMG', 'C.RAT', 'CRATE', 'CDMG'];
+      glyphs.forEach((k, v) {
+        final isPercent = percentStats.contains(k.toUpperCase());
+        final suffix = isPercent ? '%' : '';
+        glyphLines.add('   $k'.padRight(20) + '+${v.first}$suffix');
+      });
 
       final parsedPretty = '''
 🎯 ${parsed['set'] ?? '?'} (${parsed['type'] ?? '?'})
