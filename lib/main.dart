@@ -219,7 +219,52 @@ class _HomePageState extends State<HomePage> {
     if (avgG > avgR && avgG > avgB) return 2; // Зелёный
     if (avgR > r1 && avgG > g1 && avgB > b1) return 1; // Серый
     _dprint("[RANK] ⚠️ Не попал в пороги → default 5");
+
+    // 🔥 ГИБРИД: если color=5 → считаем звёзды (5 vs 6)
+    _dprint("[RANK] → проверяем звёзды (5 vs 6)");
+    final starCount = _countStars(bytes);
+    if (starCount != null && starCount >= 6) {
+      _dprint("[RANK] → 6★ (по звёздам)");
+      return 6;
+    }
     return 5;
+  }
+
+  /// 🔥 Счёт звёзд на ICON CROP (5 vs 6)
+  int? _countStars(Uint8List bytes) {
+    final img = img.decodeImage(bytes);
+    if (img == null) return null;
+
+    final lumThreshold = _prefsCache?.getInt('star_lum') ?? 150;
+
+    // Сканируем 3 линии: 1/3, 1/2, 2/3 высоты
+    final lines = [
+      img.height ~/ 3,
+      img.height ~/ 2,
+      img.height * 2 ~/ 3,
+    ];
+
+    int maxStars = 0;
+    for (final y in lines) {
+      if (y < 0 || y >= img.height) continue;
+      int count = 0;
+      bool inStar = false;
+      for (int x = 0; x < img.width; x++) {
+        final p = img.getPixel(x, y);
+        final lum = (p.r + p.g + p.b) / 3;
+        final isBright = lum > lumThreshold;
+        if (isBright && !inStar) {
+          count++;
+          inStar = true;
+        } else if (!isBright && inStar) {
+          inStar = false;
+        }
+      }
+      if (count > maxStars) maxStars = count;
+    }
+    _dprint("[STARS] count=$maxStars (threshold=$lumThreshold)");
+    return maxStars;
+  }
   }
 
   Future<Uint8List?> _cropBottomLeft(Uint8List bytes) async {
