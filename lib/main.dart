@@ -234,7 +234,25 @@ class _HomePageState extends State<HomePage> {
   int? _countStars(Uint8List bytes) {
     final img2 = img.decodeImage(bytes);
     if (img2 == null) return null;
-    final lumThreshold = _prefsCache?.getInt('star_lum') ?? 150;
+
+    // 🔥 Адаптивный порог: avg + offset
+    final offset = _prefsCache?.getInt('star_offset') ?? 30;
+    final fixedLum = _prefsCache?.getInt('star_lum') ?? 150;
+
+    // Средняя яркость ICON CROP
+    int lumSum = 0;
+    int pixels = 0;
+    for (int y = 0; y < img2.height; y++) {
+      for (int x = 0; x < img2.width; x++) {
+        final p = img2.getPixel(x, y);
+        lumSum += (p.r + p.g + p.b) / 3;
+        pixels++;
+      }
+    }
+    final avgLum = pixels > 0 ? lumSum / pixels : 0;
+    // Используем prefs star_lum если установлен вручную (не 150), иначе адаптивный
+    final lumThreshold = (fixedLum != 150) ? fixedLum : (avgLum + offset);
+
     final lines = [
       img2.height ~/ 3,
       img2.height ~/ 2,
@@ -244,21 +262,22 @@ class _HomePageState extends State<HomePage> {
     for (final y in lines) {
       if (y < 0 || y >= img2.height) continue;
       int count = 0;
-      bool inStar = false;
+      int runLength = 0;
       for (int x = 0; x < img2.width; x++) {
         final p = img2.getPixel(x, y);
         final lum = (p.r + p.g + p.b) / 3;
         final isBright = lum > lumThreshold;
-        if (isBright && !inStar) {
-          count++;
-          inStar = true;
-        } else if (!isBright && inStar) {
-          inStar = false;
+        if (isBright) {
+          runLength++;
+        } else {
+          if (runLength >= 5) count++;
+          runLength = 0;
         }
       }
+      if (runLength >= 5) count++;
       if (count > maxStars) maxStars = count;
     }
-    _dprint("[STARS] count=$maxStars (lum=$lumThreshold)");
+    _dprint("[STARS] count=$maxStars (avgLum=$avgLum, threshold=$lumThreshold, offset=$offset)");
     return maxStars;
   }
 
