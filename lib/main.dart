@@ -240,7 +240,7 @@ class _HomePageState extends State<HomePage> {
     final fixedLum = _prefsCache?.getInt('star_lum') ?? 150;
 
     // Средняя яркость ICON CROP
-    int lumSum = 0;
+    double lumSum = 0;
     int pixels = 0;
     for (int y = 0; y < img2.height; y++) {
       for (int x = 0; x < img2.width; x++) {
