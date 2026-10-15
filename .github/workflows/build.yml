@@ -36,6 +36,12 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/raid-key.jks
 
+      - name: Set version from run_number
+        run: |
+          BUILD_NUM=${{ github.run_number }}
+          sed -i "s|^version: .*|version: 3.5.39+$BUILD_NUM|" pubspec.yaml
+          grep "^version:" pubspec.yaml
+
       - name: Build APK
         run: flutter build apk --debug
 

@@ -235,5 +235,32 @@ raid_app/
 
 ---
 
-**Последнее обновление:** v3.5.34
-**Дата:** 14.10.2026
+## 🔥 v3.5.39 — OVERRIDE + ВЕРСИЯ В UI
+
+### 🎯 Что добавили:
+- 🎯 **Override ранга** в `_runOcr` (работает при «Выбрать видео»)
+- 🎯 **Версия в AppBar** — `Raid Scanner v3.5.39+167`
+- 🎯 **Пакет** `package_info_plus`
+
+### 🎯 Override:
+- 🎯 `set rank N` в REPL → `currentRank = N`
+- 🎯 При «Выбрать видео» → override применяется
+- 🎯 `set rank 0` — сброс на авто
+- 🎯 **Debug:** `[RANK] overrideRank=?, detected=?, final=?`
+
+### 🎯 Версия:
+- 🎯 В `pubspec.yaml`: `version: 3.5.39+167`
+- 🎯 В AppBar: `Raid Scanner v3.5.39+167`
+- 🎯 Пакет `package_info_plus: ^8.0.0`
+
+### ⚠️ TODO:
+- 🎯 Swift Parry 4★ → 3★ (фиолетовый порог)
+- 🎯 Cruel 5★ → 6★ (шум в звёздах)
+- 🎯 Perception — глиф без %
+- 🎯 YOLO — если критично 95%+
+- 🎯 Увеличение ICON CROP ×3
+
+---
+
+**Последнее обновление:** v3.5.39
+**Дата:** 15.10.2026
