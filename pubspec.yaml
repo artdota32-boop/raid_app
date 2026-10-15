@@ -1,7 +1,7 @@
 name: raid_app
 description: Raid artifact scanner
 publish_to: 'none'
-version: 1.0.0+1
+version: 3.5.39+167
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
@@ -15,6 +15,7 @@ dependencies:
   image: ^4.1.0
   snapframes: ^0.0.1
   shared_preferences: ^2.2.2
+  package_info_plus: ^8.0.0
 
 flutter:
   uses-material-design: true

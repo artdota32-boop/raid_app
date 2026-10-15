@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:snapframes/snapframes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:image/image.dart' as img;
 import 'package:paddle_ocr_native/paddle_ocr_native.dart' as pn;
 import 'parser.dart';
@@ -34,14 +35,25 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   SharedPreferences? _prefsCache;
+  String _version = "";
 
   @override
   void initState() {
     super.initState();
     ArtifactParser.loadPrefs();
+    _loadVersion();
     SharedPreferences.getInstance().then((p) {
       if (mounted) setState(() => _prefsCache = p);
     });
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _version = 'v${info.version}+${info.buildNumber}';
+      });
+    }
   }
   File? _videoFile;
   Uint8List? _croppedBytes;
@@ -340,8 +352,18 @@ class _HomePageState extends State<HomePage> {
       // 🔥 Авто-ранг через color-анализ
       final detectedRank = iconPart != null ? _detectRank(iconPart) : null;
       _dprint("[RANK] detected = $detectedRank");
+
+      // 🔥 OVERRIDE через prefs
+      final prefsNow2 = await SharedPreferences.getInstance();
+      final overrideRank = prefsNow2.getInt('rank') ?? 0;
+      final finalRank = (overrideRank >= 1 && overrideRank <= 6) ? overrideRank : detectedRank;
+      _dprint("[RANK] overrideRank=$overrideRank, detected=$detectedRank, final=$finalRank");
+      if (overrideRank >= 1 && overrideRank <= 6) {
+        _dprint("[RANK] OVERRIDE ACTIVE: rank=$overrideRank");
+      }
+
       final parsed = ArtifactParser.parse(results, rightBlocks: rightResults, iconBlocks: iconResults);
-      if (detectedRank != null) parsed['rank'] = detectedRank;
+      if (finalRank != null) parsed['rank'] = finalRank;
       _dprint('########## PARSER DEBUG START ##########');
       final debugList = parsed['debug'] as List<String>?;
       if (debugList != null) {
@@ -407,7 +429,7 @@ ${glyphLines.isEmpty ? '   —' : glyphLines.join('\n')}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Raid Scanner')),
+      appBar: AppBar(title: Text('Raid Scanner $_version')),
       body: SingleChildScrollView(
         child: Center(
           child: Column(
