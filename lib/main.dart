@@ -170,8 +170,18 @@ class _HomePageState extends State<HomePage> {
     final iconW = _prefsCache?.getInt('icon_w') ?? 90;
     final iconH = _prefsCache?.getInt('icon_h') ?? 35;
     final cropped = img.copyCrop(decoded, x: iconX, y: iconY, width: iconW, height: iconH);
-    debugPrint("[ICON] x=$iconX y=$iconY w=$iconW h=$iconH");
-    return Uint8List.fromList(img.encodeJpg(cropped, quality: 95));
+
+    // 🔥 ФИКС v3.5.41: увеличение ×2 для лучшего OCR
+    final iconScale = _prefsCache?.getInt('icon_scale') ?? 2;
+    final enlarged = img.copyResize(
+      cropped,
+      width: iconW * iconScale,
+      height: iconH * iconScale,
+      interpolation: img.Interpolation.cubic,
+    );
+
+    debugPrint("[ICON] x=$iconX y=$iconY w=$iconW h=$iconH scale=$iconScale");
+    return Uint8List.fromList(img.encodeJpg(enlarged, quality: 95));
   }
 
   /// 🔥 Color-анализ звёзд → ранг (1-6★)
@@ -290,11 +300,11 @@ class _HomePageState extends State<HomePage> {
         if (isBright) {
           runLength++;
         } else {
-          if (runLength >= 5) count++;
+          if (runLength >= 10) count++;
           runLength = 0;
         }
       }
-      if (runLength >= 5) count++;
+      if (runLength >= 10) count++;
       if (count > maxStars) maxStars = count;
     }
     _dprint("[STARS] count=$maxStars (avgLum=$avgLum, threshold=$lumThreshold, offset=$offset)");
