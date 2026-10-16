@@ -187,7 +187,7 @@ class _HomePageState extends State<HomePage> {
       if (!dir.existsSync()) dir.createSync(recursive: true);
       final ts = DateTime.now().millisecondsSinceEpoch;
       final f = File('${dir.path}/icon_$ts.jpg');
-      f.writeAsBytesSync(enlarged);
+      f.writeAsBytesSync(img.encodeJpg(enlarged, quality: 95));
       debugPrint("[DATASET] saved: ${f.path}");
     } catch (e) {
       debugPrint("[DATASET] err: $e");
