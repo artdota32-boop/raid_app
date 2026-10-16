@@ -234,7 +234,7 @@ class _HomePageState extends State<HomePage> {
 
     if (avgR > r6 && avgG < g6 && avgB < b6) return 6; // Красный
     if (avgR > r5 && avgG > g5 && avgB < b5) return 5; // Оранжевый
-    if (avgR > r4 && avgB > b4 && avgG < g4) return 4; // Фиолетовый
+    if (avgR > r4 && avgB > b4 && avgG < g4 + 40) return 4; // Фиолетовый (мягче)
     if (avgB > avgR && avgB > avgG) return 3; // Синий
     if (avgG > avgR && avgG > avgB) return 2; // Зелёный
     if (avgR > r1 && avgG > g1 && avgB > b1) return 1; // Серый
