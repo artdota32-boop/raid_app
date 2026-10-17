@@ -170,11 +170,11 @@ class _HomePageState extends State<HomePage> {
     final iconX = _prefsCache?.getInt('icon_x') ?? 90;
     final iconY = _prefsCache?.getInt('icon_y') ?? 388;
     final iconW = _prefsCache?.getInt('icon_w') ?? 90;
-    final iconH = _prefsCache?.getInt('icon_h') ?? 35;
+    final iconH = _prefsCache?.getInt('icon_h') ?? 25;
     final cropped = img.copyCrop(decoded, x: iconX, y: iconY, width: iconW, height: iconH);
 
     // 🔥 ФИКС v3.5.41: увеличение ×2 для лучшего OCR
-    final iconScale = _prefsCache?.getInt('icon_scale') ?? 2;
+    final iconScale = _prefsCache?.getInt('icon_scale') ?? 4;
     final enlarged = img.copyResize(
       cropped,
       width: iconW * iconScale,
@@ -189,7 +189,7 @@ class _HomePageState extends State<HomePage> {
       if (!dir.existsSync()) dir.createSync(recursive: true);
       final ts = DateTime.now().millisecondsSinceEpoch;
       final f = File('${dir.path}/icon_$ts.jpg');
-      f.writeAsBytesSync(img.encodeJpg(enlarged, quality: 95));
+      f.writeAsBytesSync(img.encodeJpg(enlarged, quality: 100));
       _dprint("[DATASET] saved: ${f.path}");
     } catch (e) {
       _dprint("[DATASET] err: $e");
