@@ -183,7 +183,7 @@ class _HomePageState extends State<HomePage> {
     debugPrint("[ICON] x=$iconX y=$iconY w=$iconW h=$iconH scale=$iconScale");
     // 🔥 СОХРАНЕНИЕ ДЛЯ ДАТАСЕТА YOLO
     try {
-      final dir = Directory('/data/data/com.termux/files/home/raid_app/dataset_icons');
+      final dir = Directory('${Directory.systemTemp.path}/dataset_icons');
       if (!dir.existsSync()) dir.createSync(recursive: true);
       final ts = DateTime.now().millisecondsSinceEpoch;
       final f = File('${dir.path}/icon_$ts.jpg');
