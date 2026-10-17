@@ -167,10 +167,10 @@ class _HomePageState extends State<HomePage> {
   Uint8List? _cropIcon(Uint8List bytes) {
     final decoded = img.decodeImage(bytes);
     if (decoded == null) return null;
-    final iconX = _prefsCache?.getInt('icon_x') ?? 90;
-    final iconY = _prefsCache?.getInt('icon_y') ?? 388;
-    final iconW = _prefsCache?.getInt('icon_w') ?? 90;
-    final iconH = _prefsCache?.getInt('icon_h') ?? 25;
+    final iconX = _prefsCache?.getInt('icon_x') ?? 91;
+    final iconY = _prefsCache?.getInt('icon_y') ?? 393;
+    final iconW = _prefsCache?.getInt('icon_w') ?? 70;
+    final iconH = _prefsCache?.getInt('icon_h') ?? 70;
     final cropped = img.copyCrop(decoded, x: iconX, y: iconY, width: iconW, height: iconH);
 
     // 🔥 ФИКС v3.5.41: увеличение ×2 для лучшего OCR
