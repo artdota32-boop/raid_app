@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:snapframes/snapframes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,6 +18,7 @@ void main() {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -447,6 +449,34 @@ ${glyphLines.isEmpty ? '   —' : glyphLines.join('\n')}
     _dprint('=== $tag #$i | text="${r.text}" | conf=${r.confidence.toStringAsFixed(2)} | x[${minX.toStringAsFixed(0)}..${maxX.toStringAsFixed(0)}] y[${minY.toStringAsFixed(0)}..${maxY.toStringAsFixed(0)}] ===');
   }
 
+  Future<void> _exportDataset() async {
+    try {
+      final srcDir = Directory('${Directory.systemTemp.path}/dataset_icons');
+      if (!srcDir.existsSync()) {
+        setState(() => _status = 'Нет кропов для экспорта');
+        return;
+      }
+      
+      // 🔥 Сохраняем в общую папку Downloads
+      final dstDir = Directory('/storage/emulated/0/Download/raid_dataset');
+      if (!dstDir.existsSync()) dstDir.createSync(recursive: true);
+      
+      int count = 0;
+      for (final file in srcDir.listSync()) {
+        if (file is File && file.path.endsWith('.jpg')) {
+          final name = file.path.split('/').last;
+          file.copySync('${dstDir.path}/$name');
+          count++;
+        }
+      }
+      setState(() => _status = 'Экспортировано $count кропов в Download/raid_dataset');
+      _dprint("[EXPORT] copied $count files to ${dstDir.path}");
+    } catch (e) {
+      setState(() => _status = 'Ошибка экспорта: $e');
+      _dprint("[EXPORT] err: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -472,6 +502,25 @@ ${glyphLines.isEmpty ? '   —' : glyphLines.join('\n')}
                 },
                 icon: const Icon(Icons.terminal),
                 label: const Text('REPL'),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton.icon(
+                onPressed: _exportDataset,
+                icon: const Icon(Icons.save_alt),
+                label: const Text('Экспорт датасета'),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade100),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: _debugLog));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Лог скопирован!')),
+                  );
+                },
+                icon: const Icon(Icons.copy),
+                label: const Text('Скопировать лог'),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade100),
               ),
               const SizedBox(height: 20),
               Text(_status, style: const TextStyle(fontSize: 16)),
